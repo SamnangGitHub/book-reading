@@ -24,7 +24,19 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - name: Validate API configuration
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error::Missing GitHub Actions repository variable VITE_API_URL. Set it to your Render API URL, for example https://khmer-reader-api.onrender.com"
+            exit 1
+          fi
+          echo "API URL is configured."
+      - name: Build frontend
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
