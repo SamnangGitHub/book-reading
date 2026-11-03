@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { googleStorageConfigured, loadBooks, saveBook as saveBookToGoogle } from "./src/googleStorage.js";
+import { apiConfigured, adminLogin, loadBooks, saveBook as saveBookToApi } from "./src/bookApi.js";
 import {
   BookOpen,
   Plus,
@@ -82,10 +82,30 @@ export default function App() {
   // Books List
   const [books, setBooks] = useState([SAMPLE_BOOK]);
   const [activeBookId, setActiveBookId] = useState(SAMPLE_BOOK.id);
-  const [storageMessage, setStorageMessage] = useState(googleStorageConfigured ? "Connecting to Google Drive and Sheets…" : "Google storage is not configured. Add your Apps Script URL to .env.local to sync books.");
+  const [storageMessage, setStorageMessage] = useState(apiConfigured ? "Connecting to the book API…" : "Book API is not configured. Set VITE_API_URL to sync books.");
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
+  const [adminToken, setAdminToken] = useState(() => sessionStorage.getItem("khmer-reader-admin-token") || "");
+
+  const requireAdmin = async (action) => {
+    if (!apiConfigured) {
+      window.alert("Book API is not configured. Set VITE_API_URL and rebuild the app.");
+      return false;
+    }
+    if (adminToken) return true;
+    const entered = window.prompt(`Enter the admin password to ${action}:`);
+    if (entered === null) return false;
+    try {
+      const token = await adminLogin(entered);
+      sessionStorage.setItem("khmer-reader-admin-token", token);
+      setAdminToken(token);
+      return true;
+    } catch (error) {
+      window.alert(error.message);
+      return false;
+    }
+  };
 
   // Reader Settings & Preferences
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -103,14 +123,14 @@ export default function App() {
   const audioRef = useRef(null);
 
   useEffect(() => {
-    if (!googleStorageConfigured) return;
+    if (!apiConfigured) return;
     let cancelled = false;
     loadBooks()
       .then((remoteBooks) => {
         if (cancelled) return;
         setBooks(remoteBooks);
         setActiveBookId(remoteBooks[0]?.id || "");
-        setStorageMessage("Connected to Google Drive and Sheets.");
+        setStorageMessage("Connected to the book API.");
       })
       .catch((error) => {
         if (!cancelled) setStorageMessage(`Google storage: ${error.message}`);
@@ -384,7 +404,7 @@ export default function App() {
   // Save Book (Handles both Create and Update)
   const handleSaveBook = async (e) => {
     if (e) e.preventDefault();
-    if (!newBook.title.trim()) return;
+    if (!(await requireAdmin("save books")) || !newBook.title.trim()) return;
 
     let bookToPersist;
 
@@ -428,14 +448,15 @@ export default function App() {
       setCurrentPageIndex(0);
     }
 
-    if (googleStorageConfigured) {
-      setStorageMessage("Saving book and media to Google Drive and Sheets…");
+    if (apiConfigured) {
+      setStorageMessage("Saving book to the API…");
       try {
-        const remoteBooks = await saveBookToGoogle(bookToPersist);
+        const remoteBooks = await saveBookToApi(bookToPersist, adminToken || sessionStorage.getItem("khmer-reader-admin-token"));
         setBooks(remoteBooks);
-        setStorageMessage("Book saved to Google Drive and Sheets.");
+        setStorageMessage("Book saved to the API.");
       } catch (error) {
-        setStorageMessage(`Google save failed: ${error.message}`);
+        setStorageMessage(`API save failed: ${error.message}`);
+        return;
       }
     }
 
@@ -505,7 +526,7 @@ export default function App() {
               </div>
 
               <button
-                onClick={openCreateNewBook}
+                onClick={async () => { if (await requireAdmin("add books")) openCreateNewBook(); }}
                 className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all"
               >
                 <Plus className="w-4 h-4" />
@@ -593,7 +614,7 @@ export default function App() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            openEditBook(b);
+                            void requireAdmin("edit books").then((allowed) => { if (allowed) openEditBook(b); });
                           }}
                           className="flex items-center space-x-1 text-slate-500 hover:text-indigo-600 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
                           title="Edit Book / Manage Pages"
@@ -661,7 +682,7 @@ export default function App() {
                       audioRef.current.pause();
                       setIsPlaying(false);
                     }
-                    if (currentBook) openEditBook(currentBook, currentPageIndex);
+                    if (currentBook) void requireAdmin("edit books").then((allowed) => { if (allowed) openEditBook(currentBook, currentPageIndex); });
                   }}
                   className="p-2 rounded-full hover:bg-black/5 active:scale-95 transition text-indigo-600"
                   title="Edit Book or Insert Pages"

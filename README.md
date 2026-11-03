@@ -1,24 +1,40 @@
 # Khmer Reader
 
-React book reader and editor. By default it opens with a sample book and keeps new books in the current browser session. To sync books, page text, covers, and audio to Google Sheets and Drive:
+React book reader with a Render hosted Node API and PostgreSQL database. The API serves public book reads and requires a server-side admin password to add or edit books. Book metadata, page text, covers, and audio are stored together as JSON in PostgreSQL.
 
-## Set up Google storage
+## Deploy to Render
 
-1. In [Google Apps Script](https://script.google.com/), create a project and paste in `google-apps-script/Code.gs`.
-2. Select `setup` in the function menu and run it once. Approve the requested Sheets and Drive permissions. The script creates a spreadsheet with `Books` and `Pages` tabs, plus a Drive folder for media.
-3. Deploy the script as a **Web app** and copy the URL ending in `/exec`.
-4. Copy `.env.local.example` to `.env.local`, then put that deployment URL after `VITE_GOOGLE_SCRIPT_URL=`.
-5. Restart the dev server (or rebuild and redeploy the site). The library will load from Sheets; saving a book uploads its media to Drive and writes page data to Sheets.
+1. Push this repository to GitHub.
+2. In Render, choose **New → Blueprint** and connect the repository. Render reads `render.yaml` to create the API web service, static site, and PostgreSQL database.
+3. When prompted, set `ADMIN_PASSWORD` to a strong private password. Render generates `TOKEN_SECRET` for signed admin sessions.
+4. Choose a persistent PostgreSQL plan and review its price before confirming. A durable database is needed to keep books across deployments.
+5. Wait for both web services to deploy. Open the static site URL; books load from the API, and the first add/edit action prompts for the admin password.
 
-## Access and media privacy
-
-This lightweight Apps Script connector uses JSONP for reads and cross-origin form-style posts for writes. Apps Script web apps that accept these requests generally need broad access, so anyone who gets the deployment URL may be able to read or change this library. Use it only for non-sensitive books and a private site; do not publish the site or deployment URL for a shared library. Uploaded media is set to **Anyone with the link can view** so covers and narration can load in the reader. For private or multi-user libraries, use a backend with Google OAuth and per-user authorization instead.
-
-The Apps Script connector stores each book in `Books` and its page records in `Pages`. Re-saving a book replaces its page rows. New media files are created in the Drive folder; old media is not automatically deleted.
+The static site receives the API URL from the Blueprint at build time. If deploying the frontend separately, set `VITE_API_URL` to the API's full `https://...onrender.com` URL, then rebuild the site. Locally, set `VITE_API_URL` in `.env.local` to the API URL and restart Vite.
 
 ## Run locally
 
+Start PostgreSQL and the API:
+
+```sh
+cd api
+npm install
+$env:DATABASE_URL="postgres://USER:PASSWORD@localhost:5432/khmer_reader"
+$env:ADMIN_PASSWORD="choose-a-private-password"
+$env:TOKEN_SECRET="use-a-long-random-secret"
+npm start
+```
+
+In another terminal, configure and start the frontend:
+
 ```sh
 npm install
-npm run dev
 ```
+
+Create `.env.local` with `VITE_API_URL=http://localhost:3000`, then run `npm run dev`.
+
+## Data and access
+
+Book reads are public. Adding and editing require a 12-hour signed admin session; the password and signing secret stay on the API service. The API accepts media data URLs up to 25 MB per request and stores them in PostgreSQL. For a large library, move media to object storage.
+
+The previous Google Apps Script library is not imported automatically. Existing books need to be added to the new API separately.
