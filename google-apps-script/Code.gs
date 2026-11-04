@@ -26,29 +26,23 @@ function setup() {
   Logger.log('Drive folder: https://drive.google.com/drive/folders/' + folderId);
 }
 
-function doGet(e) {
-  const callback = String((e.parameter && e.parameter.callback) || '');
-  if (!/^[$A-Z_a-z][$\w.]*$/.test(callback)) {
-    return jsonOutput({ ok: false, error: 'A valid JSONP callback is required.' });
-  }
-  try {
-    const books = readBooks_();
-    return ContentService.createTextOutput(callback + '(' + JSON.stringify({ ok: true, books: books }) + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  } catch (error) {
-    return ContentService.createTextOutput(callback + '(' + JSON.stringify({ ok: false, error: String(error) }) + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
+function doGet() {
+  return jsonOutput({ ok: false, error: 'Use the authenticated Render API.' });
 }
 
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
-    if (payload.action !== 'save' || !payload.book || !payload.book.id) {
-      throw new Error('Invalid save request.');
+    const expectedSecret = PropertiesService.getScriptProperties().getProperty('INTEGRATION_SECRET');
+    if (!expectedSecret || payload.secret !== expectedSecret) {
+      return jsonOutput({ ok: false, error: 'Unauthorized storage request.' });
     }
-    saveBook_(payload.book);
-    return jsonOutput({ ok: true });
+    if (payload.action === 'list') return jsonOutput({ ok: true, books: readBooks_() });
+    if (payload.action === 'save' && payload.book && payload.book.id) {
+      saveBook_(payload.book);
+      return jsonOutput({ ok: true });
+    }
+    throw new Error('Invalid storage request.');
   } catch (error) {
     return jsonOutput({ ok: false, error: String(error) });
   }
