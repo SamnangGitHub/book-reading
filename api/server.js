@@ -9,6 +9,8 @@ const adminPassword = process.env.ADMIN_PASSWORD;
 const tokenSecret = process.env.TOKEN_SECRET;
 const googleAppsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL?.trim();
 const googleAppsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
+const publicApiUrl = (process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`).replace(/\/$/, "");
+const mediaCache = new Map();
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes("render.com") ? { rejectUnauthorized: false } : undefined,
@@ -64,11 +66,11 @@ async function ensureSchema() {
   )`);
 }
 
-async function googleStorageRequest(action, book) {
+async function googleStorageRequest(action, book, fileId) {
   const response = await fetch(googleAppsScriptUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...(book ? { book } : {}) }),
+    body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...(book ? { book } : {}), ...(fileId ? { fileId } : {}) }),
     signal: AbortSignal.timeout(60000),
   });
   const result = await response.json().catch(() => null);
@@ -79,15 +81,61 @@ async function googleStorageRequest(action, book) {
 }
 
 async function listBooks() {
-  if (googleAppsScriptUrl) return (await googleStorageRequest("list")).books;
+  if (googleAppsScriptUrl) {
+    const books = (await googleStorageRequest("list")).books;
+    return books.map((book) => ({
+      ...book,
+      pages: (book.pages || []).map((page) => {
+        const fileId = getDriveFileId(page.audioUrl);
+        return fileId ? { ...page, audioUrl: `${publicApiUrl}/api/media/${encodeURIComponent(fileId)}` } : page;
+      }),
+    }));
+  }
   const { rows } = await pool.query("SELECT data FROM books ORDER BY updated_at DESC");
   return rows.map((row) => row.data);
+}
+
+function getDriveFileId(value) {
+  const url = String(value || "");
+  const queryId = url.match(/[?&]id=([^&]+)/)?.[1];
+  const pathId = url.match(/\/d\/([^/?]+)/)?.[1];
+  const id = queryId || pathId || "";
+  try { return decodeURIComponent(id); } catch { return ""; }
 }
 
 app.get("/health", (_req, res) => res.json({ ok: true, storage: googleAppsScriptUrl ? "google" : "postgres" }));
 app.get("/api/books", async (_req, res, next) => {
   try {
     res.json({ books: await listBooks() });
+  } catch (error) { next(error); }
+});
+
+app.get("/api/media/:fileId", async (req, res, next) => {
+  try {
+    const fileId = String(req.params.fileId || "");
+    if (!/^[\w-]{20,}$/.test(fileId)) return res.status(400).json({ error: "Invalid media file ID." });
+    let media = mediaCache.get(fileId);
+    if (!media) {
+      const result = await googleStorageRequest("media", undefined, fileId);
+      media = { buffer: Buffer.from(result.base64, "base64"), mimeType: result.mimeType || "application/octet-stream" };
+      if (!media.mimeType.startsWith("audio/")) return res.status(415).json({ error: "The Drive file is not an audio file." });
+      if (mediaCache.size >= 8) mediaCache.delete(mediaCache.keys().next().value);
+      mediaCache.set(fileId, media);
+    }
+
+    const { buffer, mimeType } = media;
+    res.set("Content-Type", mimeType).set("Accept-Ranges", "bytes").set("Cache-Control", "public, max-age=300");
+    const range = req.get("range");
+    if (!range) return res.set("Content-Length", buffer.length).send(buffer);
+    const match = range.match(/^bytes=(\d*)-(\d*)$/);
+    if (!match || (!match[1] && !match[2])) return res.status(416).set("Content-Range", `bytes */${buffer.length}`).end();
+    const start = match[1] ? Number(match[1]) : Math.max(0, buffer.length - Number(match[2]));
+    const end = match[2] ? Math.min(Number(match[2]), buffer.length - 1) : buffer.length - 1;
+    if (start >= buffer.length || start > end) return res.status(416).set("Content-Range", `bytes */${buffer.length}`).end();
+    res.status(206)
+      .set("Content-Range", `bytes ${start}-${end}/${buffer.length}`)
+      .set("Content-Length", end - start + 1)
+      .send(buffer.subarray(start, end + 1));
   } catch (error) { next(error); }
 });
 
