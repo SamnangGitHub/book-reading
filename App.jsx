@@ -320,6 +320,11 @@ export default function App() {
   // Page Voice Audio File Upload Handler
   const handlePageAudioUpload = (pageIndex, file) => {
     if (!file) return;
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    if (!["mp3", "wav"].includes(fileExtension)) {
+      window.alert("Choose an MP3 or WAV audio file.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       setNewBook((prev) => {
@@ -1219,7 +1224,7 @@ export default function App() {
                             </span>
                             <input
                               type="file"
-                              accept="audio/*"
+                              accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav"
                               onChange={(e) =>
                                 handlePageAudioUpload(idx, e.target.files[0])
                               }
