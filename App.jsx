@@ -44,6 +44,8 @@ export default function App() {
   const [isLoadingBooks, setIsLoadingBooks] = useState(apiConfigured);
   const [bookSearch, setBookSearch] = useState("");
   const [storageMessage, setStorageMessage] = useState("");
+  const [isSavingBook, setIsSavingBook] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
@@ -79,6 +81,7 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [audioPlaybackError, setAudioPlaybackError] = useState("");
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef(null);
@@ -164,6 +167,7 @@ export default function App() {
       setIsPlaying(false);
       setPlaybackProgress(0);
     }
+    setAudioPlaybackError("");
   }, [currentPageIndex]);
 
   // Audio Play / Pause Toggle
@@ -192,11 +196,13 @@ export default function App() {
         }
       }
 
+      setAudioPlaybackError("");
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch((err) => {
           console.warn("Audio playback error:", err);
+          setAudioPlaybackError(`Audio could not play: ${err.message || "check the Drive file access and audio format."}`);
           setIsPlaying(false);
         });
     }
@@ -230,6 +236,7 @@ export default function App() {
   // Open Editor for an Existing Book
   const openEditBook = (book, startAtPageIndex = 0) => {
     setEditingBookId(book.id);
+    setSaveStatus("");
     // Deep copy pages to avoid unintended direct mutations
     setNewBook({
       title: book.title || "",
@@ -244,6 +251,7 @@ export default function App() {
   // Open Creator for a Brand New Book
   const openCreateNewBook = () => {
     setEditingBookId(null);
+    setSaveStatus("");
     setNewBook({
       title: "",
       titleKhmer: "",
@@ -370,10 +378,14 @@ export default function App() {
   // Save Book (Handles both Create and Update)
   const handleSaveBook = async (e) => {
     if (e) e.preventDefault();
+    if (isSavingBook) return;
     if (!(await requireAdmin("save books")) || !newBook.title.trim()) return;
 
+    setIsSavingBook(true);
+    setSaveStatus("Preparing book update…");
     let bookToPersist;
 
+    try {
     if (editingBookId) {
       // Update existing book
       const updatedBooks = books.map((b) => {
@@ -415,18 +427,22 @@ export default function App() {
     }
 
     if (apiConfigured) {
-      setStorageMessage("Saving book to the API…");
+      setSaveStatus("Uploading cover, audio, and page data…");
       try {
         const remoteBooks = await saveBookToApi(bookToPersist, adminToken || sessionStorage.getItem("khmer-reader-admin-token"));
         setBooks(remoteBooks);
-        setStorageMessage("Book saved to the API.");
+        setSaveStatus("Book saved successfully.");
       } catch (error) {
         setStorageMessage(`API save failed: ${error.message}`);
+        setSaveStatus(`Save failed: ${error.message}`);
         return;
       }
     }
 
     setCurrentView("reader");
+    } finally {
+      setIsSavingBook(false);
+    }
   };
 
   // Theme-based style mapping
@@ -637,6 +653,10 @@ export default function App() {
                 src={currentPage.audioUrl}
                 preload="metadata"
                 muted={isMuted}
+                onError={() => {
+                  setIsPlaying(false);
+                  setAudioPlaybackError("Audio file failed to load. Check its Drive sharing access and try opening the link in a private browser window.");
+                }}
               />
             )}
 
@@ -876,7 +896,9 @@ export default function App() {
 
               {/* Status Indicator */}
               <div className="text-[10px] text-center text-slate-400 font-medium">
-                {currentPage?.audioUrl
+                {audioPlaybackError ? (
+                  <span className="text-rose-600" role="status">{audioPlaybackError}</span>
+                ) : currentPage?.audioUrl
                   ? `🎙️ ${currentPage.audioFileName || "Page voice track ready"}`
                   : "🎙️ Using text-to-speech fallback"}
               </div>
@@ -985,12 +1007,14 @@ export default function App() {
                 {editingBookId && (
                   <p className="text-[10px] text-indigo-600 font-medium">Editing pages & audio</p>
                 )}
+                {saveStatus && <p className="text-[10px] text-indigo-600" role="status" aria-live="polite">{saveStatus}</p>}
               </div>
               <button
                 onClick={handleSaveBook}
-                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-xs font-semibold shadow-md active:scale-95 transition"
+                disabled={isSavingBook}
+                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-xs font-semibold shadow-md active:scale-95 transition disabled:opacity-60 disabled:pointer-events-none"
               >
-                រក្សាទុក (Save)
+                {isSavingBook ? "Saving…" : "រក្សាទុក (Save)"}
               </button>
             </div>
 
@@ -1266,11 +1290,12 @@ export default function App() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-xl shadow-indigo-600/30 transition flex items-center justify-center space-x-2"
+                  disabled={isSavingBook}
+                  className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-xl shadow-indigo-600/30 transition flex items-center justify-center space-x-2 disabled:opacity-60 disabled:pointer-events-none"
                 >
                   <BookOpen className="w-4 h-4" />
                   <span>
-                    {editingBookId ? "រក្សាទុកការកែប្រែ (Save Changes)" : "បង្កើតសៀវភៅ (Publish Book)"}
+                    {isSavingBook ? "Saving book…" : editingBookId ? "រក្សាទុកការកែប្រែ (Save Changes)" : "បង្កើតសៀវភៅ (Publish Book)"}
                   </span>
                 </button>
               </div>
