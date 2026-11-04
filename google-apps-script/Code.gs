@@ -38,6 +38,11 @@ function doPost(e) {
       return jsonOutput({ ok: false, error: 'Unauthorized storage request.' });
     }
     if (payload.action === 'list') return jsonOutput({ ok: true, books: readBooks_() });
+    if (payload.action === 'media' && /^[\w-]{20,}$/.test(String(payload.fileId || ''))) {
+      if (!isStoredMediaFile_(payload.fileId)) return jsonOutput({ ok: false, error: 'Media file is not part of the library.' });
+      const blob = DriveApp.getFileById(payload.fileId).getBlob();
+      return jsonOutput({ ok: true, mimeType: blob.getContentType(), base64: Utilities.base64Encode(blob.getBytes()) });
+    }
     if (payload.action === 'save' && payload.book && payload.book.id) {
       saveBook_(payload.book);
       return jsonOutput({ ok: true });
@@ -113,6 +118,17 @@ function driveMediaUrl_(value, kind) {
   return kind === 'cover'
     ? 'https://drive.google.com/thumbnail?id=' + id + '&sz=w1200'
     : 'https://drive.google.com/uc?export=download&id=' + id;
+}
+
+function isStoredMediaFile_(fileId) {
+  const spreadsheet = getSpreadsheet_();
+  const coverValues = spreadsheet.getSheetByName('Books').getDataRange().getValues().slice(1).map(function(row) { return String(row[4] || ''); });
+  const audioValues = spreadsheet.getSheetByName('Pages').getDataRange().getValues().slice(1).map(function(row) { return String(row[5] || ''); });
+  const urls = coverValues.concat(audioValues);
+  return urls.some(function(url) {
+    const match = url.match(/[?&]id=([^&]+)/) || url.match(/\/d\/([^/?]+)/);
+    return match && decodeURIComponent(match[1]) === String(fileId);
+  });
 }
 
 function deleteBookPages_(sheet, bookId) {
