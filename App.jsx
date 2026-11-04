@@ -30,59 +30,20 @@ import {
   FolderOpen,
   ArrowUp,
   ArrowDown,
-  PlusCircle
+  PlusCircle,
+  Search
 } from "lucide-react";
-
-// Default Sample Book for immediate testing
-const SAMPLE_BOOK = {
-  id: "sample-little-prince",
-  title: "The Little Prince",
-  titleKhmer: "ព្រះអង្គម្ចាស់តូច",
-  author: "Antoine de Saint-Exupéry",
-  coverImage:
-    "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
-  pages: [
-    {
-      id: "p1",
-      pageNumber: 1,
-      originalText:
-        "Once when I was six years old I saw a magnificent picture in a book, called True Stories from Nature, about the primeval forest. It was a picture of a boa constrictor in the act of swallowing an animal.",
-      khmerText:
-        "កាលពីខ្ញុំមានអាយុប្រាំមួយឆ្នាំ ខ្ញុំបានឃើញរូបភាពដ៏អស្ចារ្យមួយនៅក្នុងសៀវភៅមួយក្បាល ដែលមានចំណងជើងថា «រឿងពិតពីធម្មជាតិ» និយាយអំពីព្រៃបុរាណ។ នោះគឺជារូបភាពសត្វពស់ថ្លាន់មួយក្បាល កំពុងតែលេបសត្វព្រៃមួយទាំងមូល។",
-      audioUrl: "",
-      audioFileName: ""
-    },
-    {
-      id: "p2",
-      pageNumber: 2,
-      originalText:
-        "In the book it said: 'Boa constrictors swallow their prey whole, without chewing it. After that they are not able to move, and they sleep through the six months that they need for digestion.'",
-      khmerText:
-        "នៅក្នុងសៀវភៅនោះបានរៀបរាប់ថា៖ «ពស់ថ្លាន់លេបរំពារបស់វាទាំងមូលដោយមិនទំពារឡើយ។ បន្ទាប់មក ពួកវាមិនអាចកម្រើកខ្លួនបានទេ ហើយត្រូវដេកលក់អស់រយៈពេលប្រាំមួយខែ ដើម្បីរំលាយអាហារនោះ។»",
-      audioUrl: "",
-      audioFileName: ""
-    },
-    {
-      id: "p3",
-      pageNumber: 3,
-      originalText:
-        "I pondered deeply, then, over the adventures of the jungle. And after some work with a colored pencil I succeeded in making my first drawing. My Drawing Number One.",
-      khmerText:
-        "ខ្ញុំបានគិតយ៉ាងស៊ីជម្រៅអំពីការផ្សងព្រេងនៅក្នុងព្រៃជ្រៅ។ បន្ទាប់មក ដោយប្រើខ្មៅដៃពណ៌ ខ្ញុំក៏បានគូររូបគំនូរដំបូងរបស់ខ្ញុំបានជោគជ័យ។ នោះគឺជារូបគំនូរលេខមួយរបស់ខ្ញុំ។",
-      audioUrl: "",
-      audioFileName: ""
-    }
-  ]
-};
 
 export default function App() {
   // Navigation State: 'library' | 'reader' | 'create'
   const [currentView, setCurrentView] = useState("library");
 
   // Books List
-  const [books, setBooks] = useState([SAMPLE_BOOK]);
-  const [activeBookId, setActiveBookId] = useState(SAMPLE_BOOK.id);
-  const [storageMessage, setStorageMessage] = useState(apiConfigured ? "Connecting to the book API…" : "Book API is not configured. Set VITE_API_URL to sync books.");
+  const [books, setBooks] = useState([]);
+  const [activeBookId, setActiveBookId] = useState("");
+  const [isLoadingBooks, setIsLoadingBooks] = useState(apiConfigured);
+  const [bookSearch, setBookSearch] = useState("");
+  const [storageMessage, setStorageMessage] = useState("");
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
@@ -130,11 +91,11 @@ export default function App() {
         if (cancelled) return;
         setBooks(remoteBooks);
         setActiveBookId(remoteBooks[0]?.id || "");
-        setStorageMessage("Connected to the book API.");
       })
       .catch((error) => {
         if (!cancelled) setStorageMessage(`Google storage: ${error.message}`);
-      });
+      })
+      .finally(() => { if (!cancelled) setIsLoadingBooks(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -503,6 +464,11 @@ export default function App() {
   };
 
   const currentTheme = themeStyles[theme];
+  const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
+  const filteredBooks = books.filter((book) =>
+    [book.title, book.titleKhmer, book.author]
+      .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch))
+  );
 
   return (
     <div
@@ -541,7 +507,7 @@ export default function App() {
 
             {/* Content List */}
             <div className="p-4 space-y-4 flex-1">
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400" role="status">{storageMessage}</p>
+              {storageMessage && <p className="text-[11px] text-rose-600 dark:text-rose-400" role="status">{storageMessage}</p>}
               {/* Banner */}
               <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg relative overflow-hidden">
                 <div className="relative z-10">
@@ -556,16 +522,35 @@ export default function App() {
                 <Sparkles className="absolute right-3 bottom-2 w-20 h-20 text-white/10 pointer-events-none" />
               </div>
 
+              <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-400 focus-within:border-indigo-400">
+                <Search className="w-4 h-4 shrink-0" />
+                <input
+                  type="search"
+                  value={bookSearch}
+                  onChange={(e) => setBookSearch(e.target.value)}
+                  placeholder="Search books by title or author"
+                  aria-label="Search books by title or author"
+                  className="w-full bg-transparent text-sm text-slate-800 dark:text-zinc-100 outline-none placeholder:text-slate-400"
+                />
+              </label>
+
               {/* Book List Header */}
               <div className="flex items-center justify-between pt-2">
                 <h2 className="text-sm font-semibold tracking-wide uppercase text-slate-500 dark:text-zinc-400">
-                  Available Books ({books.length})
+                    Available Books ({filteredBooks.length})
                 </h2>
               </div>
 
               {/* Grid of Books */}
               <div className="grid grid-cols-2 gap-3.5">
-                {books.map((b) => (
+                {isLoadingBooks ? (
+                  Array.from({ length: 4 }, (_, index) => (
+                    <div key={index} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                      <div className="aspect-[3/4] bg-slate-200 dark:bg-zinc-800" />
+                      <div className="p-3 space-y-2"><div className="h-3 w-3/4 rounded bg-slate-200 dark:bg-zinc-800" /><div className="h-2.5 w-1/2 rounded bg-slate-100 dark:bg-zinc-800" /></div>
+                    </div>
+                  ))
+                ) : filteredBooks.length ? filteredBooks.map((b) => (
                   <div
                     key={b.id}
                     className="group bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col relative"
@@ -630,7 +615,11 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <p className="col-span-2 py-10 text-center text-sm text-slate-500 dark:text-zinc-400">
+                    {books.length ? "No books match your search." : "No books available yet."}
+                  </p>
+                )}
               </div>
             </div>
           </div>
