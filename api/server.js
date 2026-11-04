@@ -23,7 +23,9 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
-app.use(express.json({ limit: "25mb" }));
+// Audio is stored as a data URL in the book JSON, which adds roughly 33% to
+// the original file size when it is base64 encoded.
+app.use(express.json({ limit: "100mb" }));
 
 function sign(payload) {
   const value = Buffer.from(JSON.stringify(payload)).toString("base64url");
