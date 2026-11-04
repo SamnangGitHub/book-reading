@@ -2,7 +2,6 @@ services:
   - type: web
     name: khmer-reader-api
     runtime: node
-    plan: free
     rootDir: api
     buildCommand: npm install
     startCommand: npm start
@@ -16,6 +15,10 @@ services:
         sync: false
       - key: TOKEN_SECRET
         generateValue: true
+      - key: GOOGLE_APPS_SCRIPT_URL
+        sync: false
+      - key: GOOGLE_APPS_SCRIPT_SECRET
+        sync: false
 
   - type: web
     name: khmer-reader
@@ -31,6 +34,5 @@ services:
 
 databases:
   - name: khmer-reader-db
-    plan: free
     databaseName: khmer_reader
     user: khmer_reader
