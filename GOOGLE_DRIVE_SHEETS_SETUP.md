@@ -32,7 +32,7 @@ Running `setup()` in Apps Script creates a spreadsheet named **Khmer Reader Libr
 | F | `audioUrl` | Audio URL; uploaded audio files are stored in Drive |
 | G | `audioFileName` | Original audio filename |
 
-The cover image and audio are files in the **Khmer Reader Media** Drive folder when uploaded as data URLs. The Sheet stores their URLs, while page text and metadata live directly in cells. A URL pasted into the cover field stays a URL and is not copied into Drive.
+The cover image and audio are files in the **Khmer Reader Media** Drive folder when uploaded as data URLs. The Sheet stores their URLs, while page text and metadata live directly in cells. A URL pasted into the cover field stays a URL and is not copied into Drive. Drive cover links are returned as thumbnail URLs; Drive audio links use the download endpoint for playback. Existing Drive URLs are normalized when the book list is read.
 
 ## Prepare the Apps Script project
 
