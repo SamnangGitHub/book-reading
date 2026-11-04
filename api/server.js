@@ -7,6 +7,8 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const adminPassword = process.env.ADMIN_PASSWORD;
 const tokenSecret = process.env.TOKEN_SECRET;
+const googleAppsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL?.trim();
+const googleAppsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes("render.com") ? { rejectUnauthorized: false } : undefined,
@@ -14,6 +16,9 @@ const pool = new Pool({
 
 if (!adminPassword || !tokenSecret || !process.env.DATABASE_URL) {
   throw new Error("Set ADMIN_PASSWORD, TOKEN_SECRET, and DATABASE_URL.");
+}
+if (Boolean(googleAppsScriptUrl) !== Boolean(googleAppsScriptSecret)) {
+  throw new Error("Set both GOOGLE_APPS_SCRIPT_URL and GOOGLE_APPS_SCRIPT_SECRET, or leave both unset.");
 }
 
 app.use((req, res, next) => {
@@ -59,11 +64,30 @@ async function ensureSchema() {
   )`);
 }
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+async function googleStorageRequest(action, book) {
+  const response = await fetch(googleAppsScriptUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...(book ? { book } : {}) }),
+    signal: AbortSignal.timeout(60000),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.ok) {
+    throw new Error(result?.error || `Google storage request failed (${response.status}).`);
+  }
+  return result;
+}
+
+async function listBooks() {
+  if (googleAppsScriptUrl) return (await googleStorageRequest("list")).books;
+  const { rows } = await pool.query("SELECT data FROM books ORDER BY updated_at DESC");
+  return rows.map((row) => row.data);
+}
+
+app.get("/health", (_req, res) => res.json({ ok: true, storage: googleAppsScriptUrl ? "google" : "postgres" }));
 app.get("/api/books", async (_req, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT data FROM books ORDER BY updated_at DESC");
-    res.json({ books: rows.map((row) => row.data) });
+    res.json({ books: await listBooks() });
   } catch (error) { next(error); }
 });
 
@@ -83,12 +107,12 @@ app.put("/api/books/:id", isAdmin, async (req, res, next) => {
     if (!book || String(book.id) !== req.params.id || !String(book.title || "").trim()) {
       return res.status(400).json({ error: "A book with a matching ID and title is required." });
     }
-    await pool.query(
+    if (googleAppsScriptUrl) await googleStorageRequest("save", book);
+    else await pool.query(
       "INSERT INTO books (id, data, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
       [book.id, JSON.stringify(book)],
     );
-    const { rows } = await pool.query("SELECT data FROM books ORDER BY updated_at DESC");
-    res.json({ books: rows.map((row) => row.data) });
+    res.json({ books: await listBooks() });
   } catch (error) { next(error); }
 });
 
