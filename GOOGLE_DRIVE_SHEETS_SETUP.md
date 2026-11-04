@@ -32,7 +32,7 @@ Running `setup()` in Apps Script creates a spreadsheet named **Khmer Reader Libr
 | F | `audioUrl` | Audio URL; uploaded audio files are stored in Drive |
 | G | `audioFileName` | Original audio filename |
 
-The cover image and audio are files in the **Khmer Reader Media** Drive folder when uploaded as data URLs. The Sheet stores their URLs, while page text and metadata live directly in cells. A URL pasted into the cover field stays a URL and is not copied into Drive. Drive cover links are returned as thumbnail URLs; Drive audio links use the download endpoint for playback. Existing Drive URLs are normalized when the book list is read.
+The cover image and audio are files in the **Khmer Reader Media** Drive folder when uploaded as data URLs. The Sheet stores their URLs, while page text and metadata live directly in cells. A URL pasted into the cover field stays a URL and is not copied into Drive. Drive cover links are returned as thumbnail URLs. The Render API proxies audio bytes from Drive and serves them with audio MIME types and byte-range support so the reader can play and seek reliably.
 
 ## Prepare the Apps Script project
 
@@ -73,7 +73,7 @@ The repository's `render.yaml` defines two private environment variables on the 
 3. In the Render dashboard open the **`khmer-reader-api`** service, then **Environment**. Add/update:
    - `GOOGLE_APPS_SCRIPT_URL` = the Apps Script deployment URL ending in `/exec`.
    - `GOOGLE_APPS_SCRIPT_SECRET` = the exact same secret saved in Apps Script Script Properties.
-4. Save changes and redeploy the API. `VITE_API_URL` stays the Render API URL; do not set it to the Apps Script URL.
+4. Save changes and redeploy the API. `VITE_API_URL` stays the Render API URL; do not set it to the Apps Script URL. For audio streaming, deploy the latest `api/server.js` and `google-apps-script/Code.gs` as well.
 5. Open `https://<your-api-host>/health`. The response should include `"storage":"google"`.
 6. Open the app, add a small test book, then check the `Books` and `Pages` tabs and the Drive media folder.
 
@@ -99,5 +99,5 @@ The Node API handles the app's admin session and forwards book reads and saves t
 ## Notes
 
 - The current Apps Script makes uploaded Drive files viewable to anyone with the link so that a public reader can display them. Use this only for content you are comfortable making public.
-- The app reads the full library as JSON. Large books, especially books with many audio files, may exceed Apps Script request or execution limits. Start with a small test upload; for large libraries, use PostgreSQL for text and media storage such as Drive/object storage separately.
+- The app reads the full library as JSON. Audio playback fetches the full audio file from Apps Script the first time, then caches up to eight files in the Render API process. Keep individual audio files modest (for example, under 10 MB); for large libraries, use dedicated media hosting with range support.
 - Do not manually reorder or rename the Sheet columns unless you also update the column indexes in `Code.gs`.
