@@ -445,6 +445,52 @@ export default function App() {
     }
   };
 
+  // Save only the selected page while retaining every other page as it was last saved.
+  const handleSavePage = async (pageIndex) => {
+    if (isSavingBook || !editingBookId) return;
+    if (!(await requireAdmin("save this page"))) return;
+    const savedBook = books.find((book) => book.id === editingBookId);
+    if (!savedBook) {
+      setSaveStatus("Could not find this book. Reopen it and try again.");
+      return;
+    }
+    const pageToSave = newBook.pages[pageIndex];
+    if (!pageToSave) return;
+    const updatedBook = {
+      ...savedBook,
+      title: newBook.title,
+      titleKhmer: newBook.titleKhmer,
+      author: newBook.author,
+      coverImage: newBook.coverImage || savedBook.coverImage,
+      pages: savedBook.pages.map((page) =>
+        page.id === pageToSave.id ? { ...pageToSave, pageNumber: page.pageNumber } : page
+      )
+    };
+    if (!updatedBook.pages.some((page) => page.id === pageToSave.id)) {
+      setSaveStatus("This page is new. Use Save Changes to save the book structure.");
+      return;
+    }
+
+    setIsSavingBook(true);
+    setSaveStatus(`Saving page ${pageIndex + 1}…`);
+    try {
+      let updatedBooks = books.map((book) => book.id === editingBookId ? updatedBook : book);
+      if (apiConfigured) {
+        updatedBooks = await saveBookToApi(
+          updatedBook,
+          adminToken || sessionStorage.getItem("khmer-reader-admin-token")
+        );
+      }
+      setBooks(updatedBooks);
+      setSaveStatus(`Page ${pageIndex + 1} saved successfully.`);
+    } catch (error) {
+      setStorageMessage(`API save failed: ${error.message}`);
+      setSaveStatus(`Page save failed: ${error.message}`);
+    } finally {
+      setIsSavingBook(false);
+    }
+  };
+
   // Theme-based style mapping
   const themeStyles = {
     light: {
@@ -1259,6 +1305,18 @@ export default function App() {
                           )}
                         </div>
                       </div>
+
+                      {editingBookId && (
+                        <button
+                          type="button"
+                          onClick={() => handleSavePage(idx)}
+                          disabled={isSavingBook}
+                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold disabled:opacity-60 disabled:pointer-events-none"
+                        >
+                          <Check className="w-4 h-4" />
+                          {isSavingBook ? "Saving…" : `Save Page ${idx + 1}`}
+                        </button>
+                      )}
                     </div>
 
                     {/* Insert Page Button between pages */}
