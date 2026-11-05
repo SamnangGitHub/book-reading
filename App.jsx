@@ -49,6 +49,7 @@ export default function App() {
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
+  const [expandedPageId, setExpandedPageId] = useState(null);
   const [adminToken, setAdminToken] = useState(() => sessionStorage.getItem("khmer-reader-admin-token") || "");
 
   const requireAdmin = async (action) => {
@@ -234,9 +235,10 @@ export default function App() {
   };
 
   // Open Editor for an Existing Book
-  const openEditBook = (book, startAtPageIndex = 0) => {
+  const openEditBook = (book) => {
     setEditingBookId(book.id);
     setSaveStatus("");
+    setExpandedPageId(null);
     // Deep copy pages to avoid unintended direct mutations
     setNewBook({
       title: book.title || "",
@@ -252,6 +254,8 @@ export default function App() {
   const openCreateNewBook = () => {
     setEditingBookId(null);
     setSaveStatus("");
+    const firstPageId = `page-${Date.now()}`;
+    setExpandedPageId(firstPageId);
     setNewBook({
       title: "",
       titleKhmer: "",
@@ -259,7 +263,7 @@ export default function App() {
       coverImage: "",
       pages: [
         {
-          id: `page-${Date.now()}`,
+          id: firstPageId,
           pageNumber: 1,
           originalText: "",
           khmerText: "",
@@ -307,12 +311,14 @@ export default function App() {
 
   // Add Page in Creator (Appends at the end)
   const addNewPageToForm = () => {
+    const id = `page-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setExpandedPageId(id);
     setNewBook((prev) => ({
       ...prev,
       pages: [
         ...prev.pages,
         {
-          id: `page-${Date.now()}`,
+          id,
           pageNumber: prev.pages.length + 1,
           originalText: "",
           khmerText: "",
@@ -325,9 +331,11 @@ export default function App() {
 
   // Insert Page at a Specific Index (e.g. after index `targetIndex`)
   const insertPageAt = (targetIndex) => {
+    const id = `page-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setExpandedPageId(id);
     setNewBook((prev) => {
       const newPage = {
-        id: `page-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        id,
         pageNumber: targetIndex + 2,
         originalText: "",
         khmerText: "",
@@ -388,6 +396,7 @@ export default function App() {
     try {
     if (editingBookId) {
       // Update existing book
+      const savedBook = books.find((book) => book.id === editingBookId);
       const updatedBooks = books.map((b) => {
         if (b.id === editingBookId) {
           return {
@@ -398,7 +407,8 @@ export default function App() {
             coverImage:
               newBook.coverImage ||
               "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80",
-            pages: newBook.pages
+            // Existing book pages are saved only with their individual Save Page action.
+            pages: savedBook?.pages || b.pages
           };
         }
         return b;
@@ -439,7 +449,11 @@ export default function App() {
       }
     }
 
-    setCurrentView("reader");
+    if (editingBookId) {
+      setSaveStatus("Book information saved. Page edits are saved individually.");
+    } else {
+      setCurrentView("reader");
+    }
     } finally {
       setIsSavingBook(false);
     }
@@ -462,14 +476,12 @@ export default function App() {
       titleKhmer: newBook.titleKhmer,
       author: newBook.author,
       coverImage: newBook.coverImage || savedBook.coverImage,
-      pages: savedBook.pages.map((page) =>
-        page.id === pageToSave.id ? { ...pageToSave, pageNumber: page.pageNumber } : page
-      )
+      pages: savedBook.pages.some((page) => page.id === pageToSave.id)
+        ? savedBook.pages.map((page) =>
+            page.id === pageToSave.id ? { ...pageToSave, pageNumber: page.pageNumber } : page
+          )
+        : [...savedBook.pages, { ...pageToSave, pageNumber: savedBook.pages.length + 1 }]
     };
-    if (!updatedBook.pages.some((page) => page.id === pageToSave.id)) {
-      setSaveStatus("This page is new. Use Save Changes to save the book structure.");
-      return;
-    }
 
     setIsSavingBook(true);
     setSaveStatus(`Saving page ${pageIndex + 1}…`);
@@ -482,10 +494,78 @@ export default function App() {
         );
       }
       setBooks(updatedBooks);
+      const persistedBook = updatedBooks.find((book) => book.id === editingBookId) || updatedBook;
+      setNewBook((prev) => ({
+        ...prev,
+        pages: prev.pages.map((page) =>
+          page.id === pageToSave.id
+            ? { ...(persistedBook.pages.find((savedPage) => savedPage.id === page.id) || page) }
+            : page
+        ).concat(prev.pages.some((page) => page.id === pageToSave.id)
+          ? []
+          : [{ ...(persistedBook.pages.find((savedPage) => savedPage.id === pageToSave.id) || pageToSave) }])
+      }));
       setSaveStatus(`Page ${pageIndex + 1} saved successfully.`);
     } catch (error) {
       setStorageMessage(`API save failed: ${error.message}`);
       setSaveStatus(`Page save failed: ${error.message}`);
+    } finally {
+      setIsSavingBook(false);
+    }
+  };
+
+  const handleDeletePage = async (pageIndex) => {
+    if (!editingBookId) {
+      removePageFromForm(pageIndex);
+      return;
+    }
+    if (isSavingBook || newBook.pages.length <= 1) return;
+    if (!window.confirm(`Delete page ${pageIndex + 1}? This cannot be undone.`)) return;
+    if (!(await requireAdmin("delete this page"))) return;
+    const savedBook = books.find((book) => book.id === editingBookId);
+    const pageToDelete = newBook.pages[pageIndex];
+    if (!savedBook || !pageToDelete) return;
+    if (!savedBook.pages.some((page) => page.id === pageToDelete.id)) {
+      setNewBook((prev) => ({
+        ...prev,
+        pages: prev.pages.filter((page) => page.id !== pageToDelete.id)
+          .map((page, index) => ({ ...page, pageNumber: index + 1 }))
+      }));
+      setExpandedPageId(newBook.pages[pageIndex - 1]?.id || null);
+      return;
+    }
+    if (savedBook.pages.length <= 1) {
+      setSaveStatus("Save another page before deleting the last saved page.");
+      return;
+    }
+    const updatedBook = {
+      ...savedBook,
+      pages: savedBook.pages
+        .filter((page) => page.id !== pageToDelete.id)
+        .map((page, index) => ({ ...page, pageNumber: index + 1 }))
+    };
+    setIsSavingBook(true);
+    setSaveStatus(`Deleting page ${pageIndex + 1}…`);
+    try {
+      let updatedBooks = books.map((book) => book.id === editingBookId ? updatedBook : book);
+      if (apiConfigured) {
+        updatedBooks = await saveBookToApi(
+          updatedBook,
+          adminToken || sessionStorage.getItem("khmer-reader-admin-token")
+        );
+      }
+      setBooks(updatedBooks);
+      const persistedBook = updatedBooks.find((book) => book.id === editingBookId) || updatedBook;
+      const nextPages = persistedBook.pages.map((savedPage) => {
+        const draftPage = newBook.pages.find((page) => page.id === savedPage.id);
+        return { ...(draftPage || savedPage), pageNumber: savedPage.pageNumber };
+      });
+      setNewBook((prev) => ({ ...prev, pages: nextPages }));
+      setExpandedPageId(nextPages[Math.min(pageIndex, nextPages.length - 1)]?.id || null);
+      setSaveStatus(`Page ${pageIndex + 1} deleted.`);
+    } catch (error) {
+      setStorageMessage(`API save failed: ${error.message}`);
+      setSaveStatus(`Page delete failed: ${error.message}`);
     } finally {
       setIsSavingBook(false);
     }
@@ -1051,7 +1131,7 @@ export default function App() {
                   {editingBookId ? "កែសម្រួលសៀវភៅ (Edit Book)" : "បង្កើតសៀវភៅថ្មី (New Book)"}
                 </h2>
                 {editingBookId && (
-                  <p className="text-[10px] text-indigo-600 font-medium">Editing pages & audio</p>
+                  <p className="text-[10px] text-indigo-600 font-medium">Open a page to edit it. Save or delete pages individually.</p>
                 )}
                 {saveStatus && <p className="text-[10px] text-indigo-600" role="status" aria-live="polite">{saveStatus}</p>}
               </div>
@@ -1060,7 +1140,7 @@ export default function App() {
                 disabled={isSavingBook}
                 className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-xs font-semibold shadow-md active:scale-95 transition disabled:opacity-60 disabled:pointer-events-none"
               >
-                {isSavingBook ? "Saving…" : "រក្សាទុក (Save)"}
+                {isSavingBook ? "Saving…" : editingBookId ? "Save Book Info" : "រក្សាទុក (Save)"}
               </button>
             </div>
 
@@ -1184,17 +1264,23 @@ export default function App() {
                     <div className="bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 relative space-y-3">
                       {/* Header of Page Box with Reordering and Delete */}
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedPageId(expandedPageId === page.id ? null : page.id)}
+                          aria-expanded={expandedPageId === page.id}
+                          className="flex items-center space-x-2 text-left"
+                        >
                           <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
-                            ទំព័រទី {idx + 1}
+                            Page {idx + 1}
                           </span>
                           <span className="text-[10px] text-slate-400">
-                            Page {idx + 1} of {newBook.pages.length}
+                            {expandedPageId === page.id ? "Editing" : "Click to edit"} · {idx + 1} of {newBook.pages.length}
                           </span>
-                        </div>
+                        </button>
 
                         {/* Page management tools: Move up, Move down, Delete */}
                         <div className="flex items-center space-x-1">
+                          {!editingBookId && <>
                           <button
                             type="button"
                             disabled={idx === 0}
@@ -1213,11 +1299,12 @@ export default function App() {
                           >
                             <ArrowDown className="w-3.5 h-3.5" />
                           </button>
+                          </>}
 
                           {newBook.pages.length > 1 && (
-                            <button
+                          <button
                               type="button"
-                              onClick={() => removePageFromForm(idx)}
+                            onClick={() => handleDeletePage(idx)}
                               className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition ml-1"
                               title="Delete Page"
                             >
@@ -1227,6 +1314,7 @@ export default function App() {
                         </div>
                       </div>
 
+                      {expandedPageId === page.id && <>
                       {/* Original Text Field */}
                       <div>
                         <label className="text-xs font-semibold text-slate-600 dark:text-zinc-300 block mb-1">
@@ -1317,10 +1405,11 @@ export default function App() {
                           {isSavingBook ? "Saving…" : `Save Page ${idx + 1}`}
                         </button>
                       )}
+                      </>}
                     </div>
 
                     {/* Insert Page Button between pages */}
-                    <div className="flex justify-center my-1">
+                    {!editingBookId && <div className="flex justify-center my-1">
                       <button
                         type="button"
                         onClick={() => insertPageAt(idx)}
@@ -1329,7 +1418,7 @@ export default function App() {
                         <PlusCircle className="w-3.5 h-3.5" />
                         <span>បញ្ចូលទំព័របន្ថែមនៅទីនេះ (Insert Page Here)</span>
                       </button>
-                    </div>
+                    </div>}
                   </React.Fragment>
                 ))}
 
@@ -1344,8 +1433,8 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-4">
+              {/* New books publish all pages together; existing books save each page separately. */}
+              {!editingBookId && <div className="pt-4">
                 <button
                   type="submit"
                   disabled={isSavingBook}
@@ -1356,7 +1445,7 @@ export default function App() {
                     {isSavingBook ? "Saving book…" : editingBookId ? "រក្សាទុកការកែប្រែ (Save Changes)" : "បង្កើតសៀវភៅ (Publish Book)"}
                   </span>
                 </button>
-              </div>
+              </div>}
             </form>
           </div>
         )}
