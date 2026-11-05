@@ -111,7 +111,9 @@ function persistDataUrl_(value, name, folder, kind) {
 
 function driveMediaUrl_(value, kind) {
   const input = String(value || '');
-  const match = input.match(/[?&]id=([^&]+)/) || input.match(/\/d\/([^/?]+)/);
+  // The Render API streams Drive audio with byte-range support. Treat its
+  // playback URL as a reference to the same Drive file when saving edits.
+  const match = input.match(/[?&]id=([^&]+)/) || input.match(/\/d\/([^/?]+)/) || input.match(/\/api\/media\/([\w-]{20,})(?:[?#]|$)/);
   const fileId = match ? decodeURIComponent(match[1]) : (/^[\w-]{20,}$/.test(input) ? input : '');
   if (!fileId) return input;
   const id = encodeURIComponent(fileId);
@@ -126,7 +128,7 @@ function isStoredMediaFile_(fileId) {
   const audioValues = spreadsheet.getSheetByName('Pages').getDataRange().getValues().slice(1).map(function(row) { return String(row[5] || ''); });
   const urls = coverValues.concat(audioValues);
   return urls.some(function(url) {
-    const match = url.match(/[?&]id=([^&]+)/) || url.match(/\/d\/([^/?]+)/);
+    const match = url.match(/[?&]id=([^&]+)/) || url.match(/\/d\/([^/?]+)/) || url.match(/\/api\/media\/([\w-]{20,})(?:[?#]|$)/);
     return match && decodeURIComponent(match[1]) === String(fileId);
   });
 }
