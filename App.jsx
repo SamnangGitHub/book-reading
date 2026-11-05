@@ -86,7 +86,6 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef(null);
-  const autoPlayNextPageRef = useRef(false);
 
   useEffect(() => {
     if (!apiConfigured) return;
@@ -146,7 +145,6 @@ export default function App() {
       setPlaybackProgress(0);
       // Auto advance to next page if available
       if (currentPageIndex < (currentBook?.pages.length || 0) - 1) {
-        autoPlayNextPageRef.current = true;
         setCurrentPageIndex((prev) => prev + 1);
       }
     };
@@ -164,45 +162,14 @@ export default function App() {
 
   // Handle Page Change Reset
   useEffect(() => {
-    const shouldAutoPlay = autoPlayNextPageRef.current;
-    autoPlayNextPageRef.current = false;
-
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      setIsPlaying(false);
       setPlaybackProgress(0);
     }
     setAudioPlaybackError("");
-
-    if (!shouldAutoPlay) {
-      setIsPlaying(false);
-      return;
-    }
-
-    if (currentPage?.audioUrl && audioRef.current) {
-      audioRef.current.play()
-        .then(() => setIsPlaying(true))
-        .catch((error) => {
-          console.warn("Next page audio playback error:", error);
-          setAudioPlaybackError(`Audio could not play: ${error.message || "check the Drive file access and audio format."}`);
-          setIsPlaying(false);
-        });
-      return;
-    }
-
-    const text = displayMode === "khmer" ? currentPage?.khmerText : currentPage?.originalText;
-    if (text && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = playbackSpeed;
-      utterance.onend = () => setIsPlaying(false);
-      utterance.onerror = () => setIsPlaying(false);
-      setIsPlaying(true);
-      window.speechSynthesis.speak(utterance);
-    } else {
-      setIsPlaying(false);
-    }
-  }, [currentPageIndex, currentPage, displayMode, playbackSpeed]);
+  }, [currentPageIndex]);
 
   // Audio Play / Pause Toggle
   const togglePlayAudio = () => {
