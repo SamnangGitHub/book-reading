@@ -32,7 +32,9 @@ Running `setup()` in Apps Script creates a spreadsheet named **Khmer Reader Libr
 | F | `audioUrl` | Audio URL; uploaded audio files are stored in Drive |
 | G | `audioFileName` | Original audio filename |
 
-The cover image and audio are files in the **Khmer Reader Media** Drive folder when uploaded as data URLs. The Sheet stores their URLs, while page text and metadata live directly in cells. A URL pasted into the cover field stays a URL and is not copied into Drive. Drive cover links are returned as thumbnail URLs. The Render API proxies audio bytes from Drive and serves them with audio MIME types and byte-range support so the reader can play and seek reliably.
+The cover image and audio are files in the **Khmer Reader Media** Drive folder when uploaded as data URLs. The Sheet stores their URLs, while page text and metadata live directly in cells. A URL pasted into the cover field stays a URL and is not copied into Drive. Drive cover links are returned as thumbnail URLs. The Render API proxies audio bytes from Drive and serves them with audio MIME types and byte-range support so the reader can play and seek reliably. The Render URL shown in the player is a streaming endpoint; the audio file itself remains in Drive. Saving an existing book preserves this Drive file reference.
+
+Audio uploads require both Google storage environment variables on the API service. If Google storage is not configured, the API rejects audio data URL uploads rather than silently saving them to PostgreSQL. Existing audio that was previously saved in PostgreSQL is not migrated automatically; re-upload those files after configuring Google storage.
 
 ## Prepare the Apps Script project
 
