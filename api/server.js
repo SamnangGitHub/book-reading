@@ -99,7 +99,10 @@ function getDriveFileId(value) {
   const url = String(value || "");
   const queryId = url.match(/[?&]id=([^&]+)/)?.[1];
   const pathId = url.match(/\/d\/([^/?]+)/)?.[1];
-  const id = queryId || pathId || "";
+  // Playback URLs are proxied through this API so the browser gets byte-range
+  // support. Keep recognizing that proxy URL when an edited book is saved.
+  const proxyId = url.match(/\/api\/media\/([\w-]{20,})(?:[?#]|$)/)?.[1];
+  const id = queryId || pathId || proxyId || "";
   try { return decodeURIComponent(id); } catch { return ""; }
 }
 
@@ -154,6 +157,9 @@ app.put("/api/books/:id", isAdmin, async (req, res, next) => {
     const book = req.body?.book;
     if (!book || String(book.id) !== req.params.id || !String(book.title || "").trim()) {
       return res.status(400).json({ error: "A book with a matching ID and title is required." });
+    }
+    if (!googleAppsScriptUrl && (book.pages || []).some((page) => String(page.audioUrl || "").startsWith("data:audio/"))) {
+      return res.status(503).json({ error: "Audio uploads require Google Drive storage. Configure GOOGLE_APPS_SCRIPT_URL and GOOGLE_APPS_SCRIPT_SECRET on the API service, then redeploy." });
     }
     if (googleAppsScriptUrl) await googleStorageRequest("save", book);
     else await pool.query(
