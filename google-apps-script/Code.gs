@@ -11,7 +11,8 @@ function setup() {
     properties.setProperty('SPREADSHEET_ID', spreadsheetId);
     const books = spreadsheet.getSheets()[0];
     books.setName('Books');
-    books.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage']);
+    if (books.getLastRow() === 0) books.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden']);
+    else if (books.getLastColumn() < 6) books.getRange(1, 6).setValue('isHidden');
     const pages = spreadsheet.insertSheet('Pages');
     pages.appendRow(['bookId', 'pageId', 'pageNumber', 'originalText', 'khmerText', 'audioUrl', 'audioFileName']);
   }
@@ -47,6 +48,10 @@ function doPost(e) {
       saveBook_(payload.book);
       return jsonOutput({ ok: true });
     }
+    if (payload.action === 'delete' && payload.book && payload.book.id) {
+      deleteBook_(payload.book.id);
+      return jsonOutput({ ok: true });
+    }
     throw new Error('Invalid storage request.');
   } catch (error) {
     return jsonOutput({ ok: false, error: String(error) });
@@ -63,7 +68,7 @@ function saveBook_(book) {
     const media = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_ID'));
 
     const cover = persistDataUrl_(book.coverImage || '', book.title + '-cover', media, 'cover');
-    const bookValues = [book.id, book.title || '', book.titleKhmer || '', book.author || '', cover];
+    const bookValues = [book.id, book.title || '', book.titleKhmer || '', book.author || '', cover, Boolean(book.isHidden)];
     const existing = findRow_(booksSheet, book.id);
     if (existing) booksSheet.getRange(existing, 1, 1, bookValues.length).setValues([bookValues]);
     else booksSheet.appendRow(bookValues);
@@ -91,11 +96,27 @@ function readBooks_() {
       titleKhmer: String(row[2] || ''),
       author: String(row[3] || ''),
       coverImage: driveMediaUrl_(String(row[4] || ''), 'cover'),
+      isHidden: row[5] === true || String(row[5]).toLowerCase() === 'true',
       pages: pageRows.filter(function(page) { return String(page[0]) === id; })
         .sort(function(a, b) { return Number(a[2]) - Number(b[2]); })
         .map(function(page) { return { id: String(page[1]), pageNumber: Number(page[2]), originalText: String(page[3] || ''), khmerText: String(page[4] || ''), audioUrl: driveMediaUrl_(String(page[5] || ''), 'audio'), audioFileName: String(page[6] || '') }; })
     };
   });
+}
+
+function deleteBook_(bookId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const spreadsheet = getSpreadsheet_();
+    const booksSheet = spreadsheet.getSheetByName('Books');
+    const pagesSheet = spreadsheet.getSheetByName('Pages');
+    deleteBookPages_(pagesSheet, bookId);
+    const row = findRow_(booksSheet, bookId);
+    if (row) booksSheet.deleteRow(row);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function persistDataUrl_(value, name, folder, kind) {
