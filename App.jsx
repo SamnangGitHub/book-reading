@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import * as XLSX from "xlsx";
 import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi } from "./src/bookApi.js";
 import {
   BookOpen,
@@ -48,6 +47,7 @@ export default function App() {
   const [isSavingBook, setIsSavingBook] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const [excelUploadName, setExcelUploadName] = useState("");
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
   const [showHiddenBooks, setShowHiddenBooks] = useState(false);
 
@@ -291,21 +291,26 @@ export default function App() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setIsImportingExcel(true);
+    setSaveStatus("Reading Excel workbook…");
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!sheet) throw new Error("The workbook does not contain a worksheet.");
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
-      const firstRow = (rows[0] || []).map((cell) => String(cell ?? "").trim().toLowerCase());
-      const hasHeader = /page\s*(number|no\.?)/i.test(firstRow[0] || "") &&
-        /(original|english)/i.test(firstRow[1] || "") &&
-        /(khmer|ភាសាខ្មែរ)/i.test(firstRow[2] || "");
-      const dataRows = rows.slice(hasHeader ? 1 : 0)
-        .map((row, index) => ({ row, index }))
-        // Ignore fully empty worksheet rows; retain every row with a page number or text.
-        .filter(({ row }) => [0, 1, 2].some((column) => String(row[column] ?? "").trim() !== ""));
-      const pages = dataRows.map(({ row, index }) => {
+      if (file.size > 25 * 1024 * 1024) throw new Error("The workbook is over the 25 MB import limit.");
+      const worker = new Worker(new URL("./src/excelImportWorker.js", import.meta.url), { type: "module" });
+      const rows = await new Promise((resolve, reject) => {
+        worker.onmessage = ({ data }) => {
+          worker.terminate();
+          data.error ? reject(new Error(data.error)) : resolve(data.rows);
+        };
+        worker.onerror = () => {
+          worker.terminate();
+          reject(new Error("Could not read this workbook. Check that it is a valid Excel file."));
+        };
+        file.arrayBuffer().then((buffer) => worker.postMessage(buffer, [buffer])).catch((error) => {
+          worker.terminate();
+          reject(error);
+        });
+      });
+      const pages = rows.map((row, index) => {
         const pageNumberValue = Number(String(row[0] ?? "").trim());
         return {
           id: `page-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
@@ -316,13 +321,14 @@ export default function App() {
           audioFileName: ""
         };
       });
-      if (!pages.length) throw new Error("No page rows found. Use columns A–C for page number, English, and Khmer text.");
       setNewBook((prev) => ({ ...prev, pages }));
       setExpandedPageId(pages[0].id);
       setExcelUploadName(`${file.name} · ${pages.length} pages imported`);
       setSaveStatus("Excel pages imported. Add the book title, then publish the book.");
     } catch (error) {
       setSaveStatus(`Excel import failed: ${error.message}`);
+    } finally {
+      setIsImportingExcel(false);
     }
   };
 
@@ -1340,10 +1346,10 @@ export default function App() {
                   <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4">
                     <label className="text-xs font-semibold mb-2 block">Import pages from Excel</label>
                     <p className="text-xs text-slate-500 dark:text-zinc-400 mb-3">First worksheet, columns A–C: page number, English text, Khmer text. A header row is optional.</p>
-                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold cursor-pointer hover:bg-indigo-700">
+                    <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold ${isImportingExcel ? "opacity-60 cursor-wait" : "cursor-pointer hover:bg-indigo-700"}`}>
                       <Upload className="w-4 h-4" />
-                      <span>Choose Excel file (.xlsx, .xls)</span>
-                      <input type="file" accept=".xlsx,.xls,.xlsm,.xlsb" onChange={handleExcelUpload} className="sr-only" />
+                      <span>{isImportingExcel ? "Reading workbook…" : "Choose Excel file (.xlsx, .xls)"}</span>
+                      <input type="file" accept=".xlsx,.xls,.xlsm,.xlsb" onChange={handleExcelUpload} disabled={isImportingExcel} className="sr-only" />
                     </label>
                     {excelUploadName && <p className="text-xs text-green-700 dark:text-green-400 mt-2">{excelUploadName}</p>}
                   </div>
