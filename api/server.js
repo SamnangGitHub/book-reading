@@ -130,7 +130,7 @@ app.get("/api/media/:fileId", async (req, res, next) => {
       const reportedMime = String(result.mimeType || "").toLowerCase();
       media = {
         buffer: Buffer.from(result.base64, "base64"),
-        mimeType: reportedMime.startsWith("audio/") ? reportedMime : mimeByExtension[extension] || "application/octet-stream",
+        mimeType: mimeByExtension[extension] || (reportedMime.startsWith("audio/") ? reportedMime : "application/octet-stream"),
       };
       if (!media.mimeType.startsWith("audio/")) return res.status(415).json({ error: "The Drive file is not a recognized audio file. Use MP3, WAV, or M4A." });
       if (mediaCache.size >= 8) mediaCache.delete(mediaCache.keys().next().value);
