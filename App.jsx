@@ -297,17 +297,27 @@ export default function App() {
       if (file.size > 25 * 1024 * 1024) throw new Error("The workbook is over the 25 MB import limit.");
       const worker = new Worker(new URL("./src/excelImportWorker.js", import.meta.url), { type: "module" });
       const rows = await new Promise((resolve, reject) => {
-        worker.onmessage = ({ data }) => {
+        const timeoutId = window.setTimeout(() => {
           worker.terminate();
-          data.error ? reject(new Error(data.error)) : resolve(data.rows);
+          reject(new Error("Excel import timed out. Try saving the workbook as .xlsx and importing it again."));
+        }, 30000);
+        const finish = (callback, value) => {
+          window.clearTimeout(timeoutId);
+          worker.terminate();
+          callback(value);
         };
-        worker.onerror = () => {
-          worker.terminate();
-          reject(new Error("Could not read this workbook. Check that it is a valid Excel file."));
+        worker.onmessage = ({ data }) => {
+          data.error ? finish(reject, new Error(data.error)) : finish(resolve, data.rows);
+        };
+        worker.onerror = (event) => {
+          event.preventDefault();
+          finish(reject, new Error("Could not read this workbook. Check that it is a valid Excel file."));
+        };
+        worker.onmessageerror = () => {
+          finish(reject, new Error("The workbook result could not be read. Try saving it as .xlsx and importing it again."));
         };
         file.arrayBuffer().then((buffer) => worker.postMessage(buffer, [buffer])).catch((error) => {
-          worker.terminate();
-          reject(error);
+          finish(reject, error);
         });
       });
       const pages = rows.map((row, index) => {
