@@ -904,7 +904,7 @@ export default function App() {
                   const isRawAac = currentPage.audioFileName?.toLowerCase().endsWith(".aac");
                   setAudioPlaybackError(isRawAac
                     ? "This is raw .aac audio, which Chrome cannot play directly. Upload its matching .wav file or convert it to .m4a (AAC in MP4), then save the page."
-                    : "Audio file failed to load. Check the Drive file access and use a browser-supported format such as MP3, WAV, or M4A.");
+                    : `Audio file failed to load (${currentPage.audioFileName || "filename unavailable"}). Check Drive access. If this track is raw .aac, replace it with the matching .wav file or convert it to .m4a (AAC in MP4), then save the page.`);
                 }}
               />
             )}
