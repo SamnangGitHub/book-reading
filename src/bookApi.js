@@ -18,6 +18,13 @@ export async function loadBooks() {
   return result.books;
 }
 
+export async function loadAdminBooks(token) {
+  const result = await request("/api/admin/books", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return result.books;
+}
+
 export async function adminLogin(password) {
   const result = await request("/api/admin/login", {
     method: "POST",
@@ -31,6 +38,14 @@ export async function saveBook(book, token) {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ book }),
+  });
+  return result.books;
+}
+
+export async function deleteBook(bookId, token) {
+  const result = await request(`/api/books/${encodeURIComponent(bookId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
   });
   return result.books;
 }
