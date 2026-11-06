@@ -393,15 +393,19 @@ export default function App() {
   const handlePageAudioUpload = (pageIndex, file) => {
     if (!file) return;
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
-    if (!["mp3", "wav"].includes(fileExtension)) {
-      window.alert("Choose an MP3 or WAV audio file.");
+    if (!["mp3", "wav", "aac", "m4a"].includes(fileExtension)) {
+      window.alert("Choose an MP3, WAV, AAC (.aac), or M4A (.m4a) audio file. For best AAC browser support, use M4A.");
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
+      const fallbackMime = { aac: "audio/aac", m4a: "audio/mp4" }[fileExtension];
+      const audioUrl = fallbackMime && String(reader.result).startsWith("data:application/octet-stream;")
+        ? String(reader.result).replace("data:application/octet-stream;", `data:${fallbackMime};`)
+        : reader.result;
       setNewBook((prev) => {
         const updated = [...prev.pages];
-        updated[pageIndex] = { ...updated[pageIndex], audioUrl: reader.result, audioFileName: file.name };
+        updated[pageIndex] = { ...updated[pageIndex], audioUrl, audioFileName: file.name };
         return { ...prev, pages: updated };
       });
     };
@@ -897,7 +901,7 @@ export default function App() {
                 muted={isMuted}
                 onError={() => {
                   setIsPlaying(false);
-                  setAudioPlaybackError("Audio file failed to load. Check its Drive sharing access and try opening the link in a private browser window.");
+                  setAudioPlaybackError("Audio file failed to load. Check that the Drive file is accessible and uses a browser-supported format. For AAC, use .m4a (AAC in MP4) or convert it to MP3.");
                 }}
               />
             )}
@@ -1499,11 +1503,11 @@ export default function App() {
                             <FileAudio className="w-4 h-4 text-indigo-600" />
                             <span className="truncate max-w-[190px]">
                               {page.audioFileName ||
-                                (page.audioUrl ? "Audio track attached" : "បញ្ចូលសំឡេង (.mp3, .wav)")}
+                                (page.audioUrl ? "Audio track attached" : "បញ្ចូលសំឡេង (.mp3, .wav, .aac, .m4a)")}
                             </span>
                             <input
                               type="file"
-                              accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav"
+                              accept=".mp3,.wav,.aac,.m4a,audio/mpeg,audio/wav,audio/x-wav,audio/aac,audio/mp4"
                               onChange={(e) =>
                                 handlePageAudioUpload(idx, e.target.files[0])
                               }
