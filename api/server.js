@@ -125,8 +125,14 @@ app.get("/api/media/:fileId", async (req, res, next) => {
     let media = mediaCache.get(fileId);
     if (!media) {
       const result = await googleStorageRequest("media", undefined, fileId);
-      media = { buffer: Buffer.from(result.base64, "base64"), mimeType: result.mimeType || "application/octet-stream" };
-      if (!media.mimeType.startsWith("audio/")) return res.status(415).json({ error: "The Drive file is not an audio file." });
+      const extension = String(result.fileName || "").split(".").pop().toLowerCase();
+      const mimeByExtension = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac" };
+      const reportedMime = String(result.mimeType || "").toLowerCase();
+      media = {
+        buffer: Buffer.from(result.base64, "base64"),
+        mimeType: reportedMime.startsWith("audio/") ? reportedMime : mimeByExtension[extension] || "application/octet-stream",
+      };
+      if (!media.mimeType.startsWith("audio/")) return res.status(415).json({ error: "The Drive file is not a recognized audio file. Use MP3, WAV, or M4A." });
       if (mediaCache.size >= 8) mediaCache.delete(mediaCache.keys().next().value);
       mediaCache.set(fileId, media);
     }
