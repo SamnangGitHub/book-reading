@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
-import { apiConfigured, adminLogin, loadBooks, saveBook as saveBookToApi } from "./src/bookApi.js";
+import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi } from "./src/bookApi.js";
 import {
   BookOpen,
   Plus,
@@ -48,6 +48,8 @@ export default function App() {
   const [isSavingBook, setIsSavingBook] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const [excelUploadName, setExcelUploadName] = useState("");
+  const [adminMode, setAdminMode] = useState(false);
+  const [showHiddenBooks, setShowHiddenBooks] = useState(false);
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
@@ -59,13 +61,19 @@ export default function App() {
       window.alert("Book API is not configured. Set VITE_API_URL and rebuild the app.");
       return false;
     }
-    if (adminToken) return true;
+    if (adminToken) {
+      setAdminMode(true);
+      loadAdminBooks(adminToken).then(setBooks).catch((error) => setStorageMessage(`Could not load admin books: ${error.message}`));
+      return true;
+    }
     const entered = window.prompt(`Enter the admin password to ${action}:`);
     if (entered === null) return false;
     try {
       const token = await adminLogin(entered);
       sessionStorage.setItem("khmer-reader-admin-token", token);
       setAdminToken(token);
+      setAdminMode(true);
+      loadAdminBooks(token).then(setBooks).catch((error) => setStorageMessage(`Could not load admin books: ${error.message}`));
       return true;
     } catch (error) {
       window.alert(error.message);
@@ -308,6 +316,29 @@ export default function App() {
       setSaveStatus("Excel pages imported. Add the book title, then publish the book.");
     } catch (error) {
       setSaveStatus(`Excel import failed: ${error.message}`);
+    }
+  };
+
+  const handleToggleBookVisibility = async (book) => {
+    if (!(await requireAdmin(book.isHidden ? "unhide this book" : "hide this book"))) return;
+    try {
+      const updatedBooks = await saveBookToApi({ ...book, isHidden: !book.isHidden }, adminToken || sessionStorage.getItem("khmer-reader-admin-token"));
+      setBooks(updatedBooks);
+    } catch (error) {
+      setSaveStatus(`Could not update book visibility: ${error.message}`);
+      setStorageMessage(`Book visibility update failed: ${error.message}`);
+    }
+  };
+
+  const handleDeleteBook = async (book) => {
+    if (!window.confirm(`Permanently delete “${book.title}” and all its pages? This cannot be undone.`)) return;
+    if (!(await requireAdmin("delete books"))) return;
+    try {
+      const updatedBooks = await deleteBookFromApi(book.id, adminToken || sessionStorage.getItem("khmer-reader-admin-token"));
+      setBooks(updatedBooks);
+      if (activeBookId === book.id) setActiveBookId(updatedBooks.find((item) => !item.isHidden)?.id || "");
+    } catch (error) {
+      setStorageMessage(`Book deletion failed: ${error.message}`);
     }
   };
 
@@ -643,7 +674,7 @@ export default function App() {
 
   const currentTheme = themeStyles[theme];
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
-  const filteredBooks = books.filter((book) =>
+  const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
     [book.title, book.titleKhmer, book.author]
       .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch))
   );
@@ -715,8 +746,13 @@ export default function App() {
               {/* Book List Header */}
               <div className="flex items-center justify-between pt-2">
                 <h2 className="text-sm font-semibold tracking-wide uppercase text-slate-500 dark:text-zinc-400">
-                    Available Books ({filteredBooks.length})
+                    {adminMode && showHiddenBooks ? "Hidden Books" : "Available Books"} ({filteredBooks.length})
                 </h2>
+                {adminMode && (
+                  <button onClick={() => setShowHiddenBooks((hidden) => !hidden)} className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800">
+                    {showHiddenBooks ? "Show available" : "Show hidden"}
+                  </button>
+                )}
               </div>
 
               {/* Grid of Books */}
@@ -769,8 +805,20 @@ export default function App() {
                         </p>
                       </div>
 
-                      {/* Bottom action bar with Read and Quick Edit */}
+                      {/* Book actions */}
                       <div className="mt-3 pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-medium">
+                        {adminMode && <button
+                          onClick={() => void handleToggleBookVisibility(b)}
+                          className="text-amber-700 hover:text-amber-900 dark:text-amber-400 p-1"
+                          title={b.isHidden ? "Unhide this book" : "Hide this book from readers"}
+                        >
+                          {b.isHidden ? "Unhide" : "Hide"}
+                        </button>}
+                        {adminMode && <button
+                          onClick={() => void handleDeleteBook(b)}
+                          className="text-red-600 hover:text-red-800 p-1"
+                          title="Permanently delete this book and its pages"
+                        >Delete</button>}
                         <button
                           onClick={() => openReader(b.id)}
                           className="text-indigo-600 hover:text-indigo-700 flex items-center space-x-0.5"
