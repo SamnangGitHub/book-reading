@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
 import { apiConfigured, adminLogin, loadBooks, saveBook as saveBookToApi } from "./src/bookApi.js";
 import {
   BookOpen,
@@ -46,6 +47,7 @@ export default function App() {
   const [storageMessage, setStorageMessage] = useState("");
   const [isSavingBook, setIsSavingBook] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
+  const [excelUploadName, setExcelUploadName] = useState("");
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
@@ -254,6 +256,7 @@ export default function App() {
   const openCreateNewBook = () => {
     setEditingBookId(null);
     setSaveStatus("");
+    setExcelUploadName("");
     const firstPageId = `page-${Date.now()}`;
     setExpandedPageId(firstPageId);
     setNewBook({
@@ -273,6 +276,39 @@ export default function App() {
       ]
     });
     setCurrentView("create");
+  };
+
+  // Import page rows from an Excel workbook (A: page number, B: English, C: Khmer).
+  const handleExcelUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!sheet) throw new Error("The workbook does not contain a worksheet.");
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+      const pages = rows.map((row, index) => ({ row, index }))
+        .filter(({ row }) => String(row[0] ?? "").trim() || String(row[1] ?? "").trim() || String(row[2] ?? "").trim())
+        .filter(({ row, index }) => !(index === 0 && !Number.isFinite(Number(String(row[0]).trim()))))
+        .map(({ row, index }) => ({
+          id: `page-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+          pageNumber: Number(String(row[0]).trim()) || index + 1,
+          originalText: String(row[1] ?? "").trim(),
+          khmerText: String(row[2] ?? "").trim(),
+          audioUrl: "",
+          audioFileName: ""
+        }));
+      if (!pages.length) throw new Error("No page rows found. Use columns A–C for page number, English, and Khmer text.");
+      pages.sort((a, b) => a.pageNumber - b.pageNumber);
+      setNewBook((prev) => ({ ...prev, pages }));
+      setExpandedPageId(pages[0].id);
+      setExcelUploadName(`${file.name} · ${pages.length} pages imported`);
+      setSaveStatus("Excel pages imported. Add the book title, then publish the book.");
+    } catch (error) {
+      setSaveStatus(`Excel import failed: ${error.message}`);
+    }
   };
 
   // Cover Image File Upload Handler
@@ -1245,6 +1281,18 @@ export default function App() {
 
               {/* SECTION: Page By Page Content */}
               <div className="space-y-4">
+                {!editingBookId && (
+                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4">
+                    <label className="text-xs font-semibold mb-2 block">Import pages from Excel</label>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 mb-3">First worksheet, columns A–C: page number, English text, Khmer text. A header row is optional.</p>
+                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold cursor-pointer hover:bg-indigo-700">
+                      <Upload className="w-4 h-4" />
+                      <span>Choose Excel file (.xlsx, .xls)</span>
+                      <input type="file" accept=".xlsx,.xls,.xlsm,.xlsb" onChange={handleExcelUpload} className="sr-only" />
+                    </label>
+                    {excelUploadName && <p className="text-xs text-green-700 dark:text-green-400 mt-2">{excelUploadName}</p>}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
                     មាតិកាតាមទំព័រ (Pages: {newBook.pages.length})
