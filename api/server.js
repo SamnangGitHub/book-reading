@@ -26,7 +26,7 @@ if (Boolean(googleAppsScriptUrl) !== Boolean(googleAppsScriptSecret)) {
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
@@ -109,8 +109,13 @@ function getDriveFileId(value) {
 app.get("/health", (_req, res) => res.json({ ok: true, storage: googleAppsScriptUrl ? "google" : "postgres" }));
 app.get("/api/books", async (_req, res, next) => {
   try {
-    res.json({ books: await listBooks() });
+    res.json({ books: (await listBooks()).filter((book) => !book.isHidden) });
   } catch (error) { next(error); }
+});
+
+app.get("/api/admin/books", isAdmin, async (_req, res, next) => {
+  try { res.json({ books: await listBooks() }); }
+  catch (error) { next(error); }
 });
 
 app.get("/api/media/:fileId", async (req, res, next) => {
@@ -166,6 +171,14 @@ app.put("/api/books/:id", isAdmin, async (req, res, next) => {
       "INSERT INTO books (id, data, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
       [book.id, JSON.stringify(book)],
     );
+    res.json({ books: await listBooks() });
+  } catch (error) { next(error); }
+});
+
+app.delete("/api/books/:id", isAdmin, async (req, res, next) => {
+  try {
+    if (googleAppsScriptUrl) await googleStorageRequest("delete", { id: req.params.id });
+    else await pool.query("DELETE FROM books WHERE id = $1", [req.params.id]);
     res.json({ books: await listBooks() });
   } catch (error) { next(error); }
 });
