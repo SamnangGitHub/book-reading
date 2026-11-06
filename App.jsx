@@ -393,17 +393,15 @@ export default function App() {
   const handlePageAudioUpload = (pageIndex, file) => {
     if (!file) return;
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
-    if (!["mp3", "wav", "m4a"].includes(fileExtension)) {
-      window.alert("Choose an MP3, WAV, or M4A audio file. Raw .aac files are not supported reliably by browsers.");
+    if (!["mp3", "wav"].includes(fileExtension)) {
+      window.alert("Choose an MP3 or WAV audio file.");
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const mimeByExtension = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4" };
-      const audioUrl = String(reader.result).replace(/^data:[^;,]+;/, `data:${mimeByExtension[fileExtension]};`);
       setNewBook((prev) => {
         const updated = [...prev.pages];
-        updated[pageIndex] = { ...updated[pageIndex], audioUrl, audioFileName: file.name };
+        updated[pageIndex] = { ...updated[pageIndex], audioUrl: reader.result, audioFileName: file.name };
         return { ...prev, pages: updated };
       });
     };
@@ -899,10 +897,7 @@ export default function App() {
                 muted={isMuted}
                 onError={() => {
                   setIsPlaying(false);
-                  const isRawAac = currentPage.audioFileName?.toLowerCase().endsWith(".aac");
-                  setAudioPlaybackError(isRawAac
-                    ? "This is raw .aac audio, which Chrome cannot play directly. Upload its matching .wav file or convert it to .m4a (AAC in MP4), then save the page."
-                    : `Could not play ${currentPage.audioFileName || "this audio file"}. For the most reliable playback, upload an MP3 file in the editor and click Save Page. Also check that the Drive file is accessible.`);
+                  setAudioPlaybackError("Audio file failed to load. Check its Drive sharing access and try opening the link in a private browser window.");
                 }}
               />
             )}
@@ -1504,15 +1499,14 @@ export default function App() {
                             <FileAudio className="w-4 h-4 text-indigo-600" />
                             <span className="truncate max-w-[190px]">
                               {page.audioFileName ||
-                                (page.audioUrl ? "Audio track attached" : "បញ្ចូលសំឡេង (.mp3, .wav, .m4a)")}
+                                (page.audioUrl ? "Audio track attached" : "បញ្ចូលសំឡេង (.mp3, .wav)")}
                             </span>
                             <input
                               type="file"
-                              accept=".mp3,audio/mpeg,.wav,audio/wav,audio/x-wav,.m4a,audio/mp4"
-                              onChange={(e) => {
-                                handlePageAudioUpload(idx, e.target.files[0]);
-                                e.target.value = "";
-                              }}
+                              accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav"
+                              onChange={(e) =>
+                                handlePageAudioUpload(idx, e.target.files[0])
+                              }
                               className="hidden"
                             />
                           </label>
