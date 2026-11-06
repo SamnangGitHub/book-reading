@@ -287,9 +287,7 @@ export default function App() {
   };
 
   // Import page rows from an Excel workbook (A: page number, B: English, C: Khmer).
-  const handleExcelUpload = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  const importExcelFile = async (file) => {
     if (!file) return;
     setIsImportingExcel(true);
     setSaveStatus("Reading Excel workbook…");
@@ -340,6 +338,17 @@ export default function App() {
     } finally {
       setIsImportingExcel(false);
     }
+  };
+
+  const handleExcelUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    void importExcelFile(file);
+  };
+
+  const handleExcelDrop = (event) => {
+    event.preventDefault();
+    void importExcelFile(event.dataTransfer.files?.[0]);
   };
 
   const handleToggleBookVisibility = async (book) => {
@@ -1353,9 +1362,13 @@ export default function App() {
               {/* SECTION: Page By Page Content */}
               <div className="space-y-4">
                 {!editingBookId && (
-                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4">
+                  <div
+                    className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-4"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={handleExcelDrop}
+                  >
                     <label className="text-xs font-semibold mb-2 block">Import pages from Excel</label>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 mb-3">First worksheet, columns A–C: page number, English text, Khmer text. A header row is optional.</p>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 mb-3">Drop an Excel workbook here, or choose one. First worksheet, columns A–C: page number, English text, Khmer text. A header row is optional.</p>
                     <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold ${isImportingExcel ? "opacity-60 cursor-wait" : "cursor-pointer hover:bg-indigo-700"}`}>
                       <Upload className="w-4 h-4" />
                       <span>{isImportingExcel ? "Reading workbook…" : "Choose Excel file (.xlsx, .xls)"}</span>
