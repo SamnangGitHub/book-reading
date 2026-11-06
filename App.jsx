@@ -394,15 +394,13 @@ export default function App() {
     if (!file) return;
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
     if (!["mp3", "wav", "m4a"].includes(fileExtension)) {
-      window.alert("Choose an MP3, WAV, or M4A (.m4a) audio file. Raw .aac files are not supported reliably by browsers; convert to M4A or use WAV.");
+      window.alert("Choose an MP3, WAV, or M4A audio file. Raw .aac files are not supported reliably by browsers.");
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const fallbackMime = { m4a: "audio/mp4" }[fileExtension];
-      const audioUrl = fallbackMime && String(reader.result).startsWith("data:application/octet-stream;")
-        ? String(reader.result).replace("data:application/octet-stream;", `data:${fallbackMime};`)
-        : reader.result;
+      const mimeByExtension = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4" };
+      const audioUrl = String(reader.result).replace(/^data:[^;,]+;/, `data:${mimeByExtension[fileExtension]};`);
       setNewBook((prev) => {
         const updated = [...prev.pages];
         updated[pageIndex] = { ...updated[pageIndex], audioUrl, audioFileName: file.name };
@@ -904,7 +902,7 @@ export default function App() {
                   const isRawAac = currentPage.audioFileName?.toLowerCase().endsWith(".aac");
                   setAudioPlaybackError(isRawAac
                     ? "This is raw .aac audio, which Chrome cannot play directly. Upload its matching .wav file or convert it to .m4a (AAC in MP4), then save the page."
-                    : `Audio file failed to load (${currentPage.audioFileName || "filename unavailable"}). Check Drive access. If this track is raw .aac, replace it with the matching .wav file or convert it to .m4a (AAC in MP4), then save the page.`);
+                    : `Could not play ${currentPage.audioFileName || "this audio file"}. For the most reliable playback, upload an MP3 file in the editor and click Save Page. Also check that the Drive file is accessible.`);
                 }}
               />
             )}
@@ -1510,10 +1508,11 @@ export default function App() {
                             </span>
                             <input
                               type="file"
-                              accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/x-wav,audio/mp4"
-                              onChange={(e) =>
-                                handlePageAudioUpload(idx, e.target.files[0])
-                              }
+                              accept=".mp3,audio/mpeg,.wav,audio/wav,audio/x-wav,.m4a,audio/mp4"
+                              onChange={(e) => {
+                                handlePageAudioUpload(idx, e.target.files[0]);
+                                e.target.value = "";
+                              }}
                               className="hidden"
                             />
                           </label>
