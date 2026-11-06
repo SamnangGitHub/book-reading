@@ -297,19 +297,26 @@ export default function App() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       if (!sheet) throw new Error("The workbook does not contain a worksheet.");
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
-      const pages = rows.map((row, index) => ({ row, index }))
-        .filter(({ row }) => String(row[0] ?? "").trim() || String(row[1] ?? "").trim() || String(row[2] ?? "").trim())
-        .filter(({ row, index }) => !(index === 0 && !Number.isFinite(Number(String(row[0]).trim()))))
-        .map(({ row, index }) => ({
+      const firstRow = (rows[0] || []).map((cell) => String(cell ?? "").trim().toLowerCase());
+      const hasHeader = /page\s*(number|no\.?)/i.test(firstRow[0] || "") &&
+        /(original|english)/i.test(firstRow[1] || "") &&
+        /(khmer|ភាសាខ្មែរ)/i.test(firstRow[2] || "");
+      const dataRows = rows.slice(hasHeader ? 1 : 0)
+        .map((row, index) => ({ row, index }))
+        // Ignore fully empty worksheet rows; retain every row with a page number or text.
+        .filter(({ row }) => [0, 1, 2].some((column) => String(row[column] ?? "").trim() !== ""));
+      const pages = dataRows.map(({ row, index }) => {
+        const pageNumberValue = Number(String(row[0] ?? "").trim());
+        return {
           id: `page-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
-          pageNumber: Number(String(row[0]).trim()) || index + 1,
-          originalText: String(row[1] ?? "").trim(),
-          khmerText: String(row[2] ?? "").trim(),
+          pageNumber: Number.isFinite(pageNumberValue) && pageNumberValue > 0 ? pageNumberValue : index + 1,
+          originalText: String(row[1] ?? ""),
+          khmerText: String(row[2] ?? ""),
           audioUrl: "",
           audioFileName: ""
-        }));
+        };
+      });
       if (!pages.length) throw new Error("No page rows found. Use columns A–C for page number, English, and Khmer text.");
-      pages.sort((a, b) => a.pageNumber - b.pageNumber);
       setNewBook((prev) => ({ ...prev, pages }));
       setExpandedPageId(pages[0].id);
       setExcelUploadName(`${file.name} · ${pages.length} pages imported`);
@@ -805,8 +812,8 @@ export default function App() {
                         </p>
                       </div>
 
-                      {/* Book actions */}
-                      <div className="mt-3 pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-medium">
+                      {/* Book actions are only shown after admin authentication. */}
+                      {adminMode && <div className="mt-3 pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-medium">
                         {adminMode && <button
                           onClick={() => void handleToggleBookVisibility(b)}
                           className="text-amber-700 hover:text-amber-900 dark:text-amber-400 p-1"
@@ -838,7 +845,7 @@ export default function App() {
                           <Edit3 className="w-3.5 h-3.5" />
                           <span className="text-[10px]">Edit</span>
                         </button>
-                      </div>
+                      </div>}
                     </div>
                   </div>
                 )) : (
