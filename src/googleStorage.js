@@ -45,7 +45,23 @@ export async function saveBook(book) {
     const pagesMatch = stored?.pages?.length === book.pages.length && stored.pages.every((page, index) =>
       page.originalText === book.pages[index].originalText && page.khmerText === book.pages[index].khmerText
     );
-    if (stored?.title === book.title && stored?.author === book.author && pagesMatch) return books;
+    if (stored?.title === book.title && stored?.author === book.author && Boolean(stored?.isHidden) === Boolean(book.isHidden) && pagesMatch) return books;
   }
   throw new Error("Google Sheets did not confirm the saved book. Check the Apps Script deployment permissions.");
+}
+
+export async function deleteBook(bookId) {
+  if (!endpoint) return [];
+  await fetch(endpoint, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "delete", book: { id: bookId } }),
+  });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, attempt === 0 ? 900 : 1200));
+    const books = await loadBooks();
+    if (!books.some((book) => book.id === bookId)) return books;
+  }
+  throw new Error("Google Sheets did not confirm the book deletion. Check the Apps Script deployment.");
 }
