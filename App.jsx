@@ -82,12 +82,16 @@ export default function App() {
       setShowAccountForm(false);
       setAccountPhone("");
       setAccountMessage(`Signed in as ${user.username}.`);
-      const saved = await loadReadingProgress(user.username);
-      const progressMap = Object.fromEntries((saved.progress || []).map((item) => [item.bookId, Number(item.pageIndex) || 0]));
-      setReadingProgress(progressMap);
-      localStorage.setItem("khmer-reader-progress", JSON.stringify(progressMap));
-      const latest = (saved.progress || []).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-      if (latest) setAccountMessage(`Welcome back, ${user.username}. Your reading history is saved.`);
+      try {
+        const saved = await loadReadingProgress(user.username);
+        const progressMap = Object.fromEntries((saved.progress || []).map((item) => [item.bookId, Number(item.pageIndex) || 0]));
+        setReadingProgress(progressMap);
+        localStorage.setItem("khmer-reader-progress", JSON.stringify(progressMap));
+        const latest = (saved.progress || []).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+        if (latest) setAccountMessage(`Welcome back, ${user.username}. Your reading history is saved.`);
+      } catch (error) {
+        setAccountMessage(`Signed in as ${user.username}, but reading history could not load: ${error.message}`);
+      }
     } catch (error) { setAccountMessage(error.message); }
     finally { setAccountBusy(false); }
   };
