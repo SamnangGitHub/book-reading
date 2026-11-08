@@ -777,7 +777,8 @@ export default function App() {
     [book.title, book.titleKhmer, book.author]
       .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch)) &&
     (libraryFilter !== "reading" || readingProgress[book.id] > 0) &&
-    (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl))
+    (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl)) &&
+    (libraryFilter !== "favorites" || readingProgress[book.id] > 0)
   );
 
   return (
@@ -791,7 +792,7 @@ export default function App() {
         {/* VIEW 1: BOOK LIBRARY                                      */}
         {/* ========================================================= */}
         {currentView === "library" && (
-          <div className="flex-1 flex flex-col pb-10">
+          <div className="flex-1 flex flex-col pb-20">
             {/* Header */}
             <header className="sticky top-0 z-20 backdrop-blur-md bg-white/95 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
@@ -987,7 +988,7 @@ export default function App() {
         {/* VIEW 2: DUAL-LANGUAGE AUDIO READER                       */}
         {/* ========================================================= */}
         {currentView === "reader" && (
-          <div className="flex-1 flex flex-col h-screen">
+          <div className="flex-1 flex flex-col h-[calc(100dvh-58px)]">
             {/* Hidden Audio Element */}
             {currentPage?.audioUrl && (
               <audio
@@ -1685,6 +1686,23 @@ export default function App() {
             </form>
           </div>
         )}
+
+        <nav aria-label="Mobile navigation" className="fixed bottom-0 left-1/2 z-40 w-full max-w-5xl -translate-x-1/2 border-t border-slate-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md">
+          <div className="grid h-[58px] grid-cols-4">
+            <button onClick={() => { setCurrentView("library"); setLibraryFilter("all"); }} className={`flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium ${currentView === "library" && libraryFilter === "all" ? "text-indigo-600" : "text-slate-400"}`} aria-current={currentView === "library" && libraryFilter === "all" ? "page" : undefined}>
+              <BookOpen className="h-4 w-4" /><span>Library</span>
+            </button>
+            <button onClick={() => { setCurrentView("library"); setLibraryFilter("audio"); }} className={`flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium ${currentView === "library" && libraryFilter === "audio" ? "text-indigo-600" : "text-slate-400"}`} aria-current={currentView === "library" && libraryFilter === "audio" ? "page" : undefined}>
+              <Volume2 className="h-4 w-4" /><span>Audio</span>
+            </button>
+            <button onClick={() => { setCurrentView("library"); setLibraryFilter("favorites"); }} className={`flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium ${currentView === "library" && libraryFilter === "favorites" ? "text-indigo-600" : "text-slate-400"}`} aria-current={currentView === "library" && libraryFilter === "favorites" ? "page" : undefined}>
+              <Bookmark className="h-4 w-4 fill-current" /><span>Saved</span>
+            </button>
+            <button onClick={() => currentView === "reader" ? setShowSettingsModal(true) : (setAccountMode("login"), setAccountMessage(""), setShowAccountForm(true))} className="flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium text-slate-400">
+              <Settings className="h-4 w-4" /><span>Settings</span>
+            </button>
+          </div>
+        </nav>
       </div>
     </div>
   );
