@@ -41,8 +41,9 @@ function doPost(e) {
     if (payload.action === 'list') return jsonOutput({ ok: true, books: readBooks_() });
     if (payload.action === 'media' && /^[\w-]{20,}$/.test(String(payload.fileId || ''))) {
       if (!isStoredMediaFile_(payload.fileId)) return jsonOutput({ ok: false, error: 'Media file is not part of the library.' });
-      const blob = DriveApp.getFileById(payload.fileId).getBlob();
-      return jsonOutput({ ok: true, mimeType: blob.getContentType(), base64: Utilities.base64Encode(blob.getBytes()) });
+      const file = DriveApp.getFileById(payload.fileId);
+      const blob = file.getBlob();
+      return jsonOutput({ ok: true, fileName: file.getName(), mimeType: blob.getContentType(), base64: Utilities.base64Encode(blob.getBytes()) });
     }
     if (payload.action === 'save' && payload.book && payload.book.id) {
       saveBook_(payload.book);
