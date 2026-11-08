@@ -109,7 +109,12 @@ async function googleStorageRequest(action, book, fileId) {
 async function googleUserRequest(action, data) {
   const response = await fetch(googleAppsScriptUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...data }), signal: AbortSignal.timeout(30000) });
   const result = await response.json().catch(() => null);
-  if (!response.ok || !result?.ok) throw new Error(result?.error || "Account storage request failed.");
+  if (!response.ok || !result?.ok) {
+    const error = new Error(result?.error || "Account storage request failed.");
+    if (action === "login") error.status = 401;
+    else if (action === "register") error.status = /already registered/i.test(error.message) ? 409 : 400;
+    throw error;
+  }
   return result;
 }
 
@@ -246,8 +251,8 @@ app.post("/api/admin/login", (req, res) => {
 app.put("/api/books/:id", isAdmin, async (req, res, next) => {
   try {
     const book = req.body?.book;
-    if (!book || String(book.id) !== req.params.id || !String(book.title || "").trim()) {
-      return res.status(400).json({ error: "A book with a matching ID and title is required." });
+    if (!book || String(book.id) !== req.params.id || !String(book.title || "").trim() || !String(book.bookType || "").trim()) {
+      return res.status(400).json({ error: "A book with a matching ID, title, and book type is required." });
     }
     if (!googleAppsScriptUrl && (book.pages || []).some((page) => String(page.audioUrl || "").startsWith("data:audio/"))) {
       return res.status(503).json({ error: "Audio uploads require Google Drive storage. Configure GOOGLE_APPS_SCRIPT_URL and GOOGLE_APPS_SCRIPT_SECRET on the API service, then redeploy." });
@@ -271,7 +276,8 @@ app.delete("/api/books/:id", isAdmin, async (req, res, next) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-  res.status(500).json({ error: "The API could not complete the request." });
+  const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500 ? error.status : 500;
+  res.status(status).json({ error: status < 500 ? error.message : "The API could not complete the request." });
 });
 
 await ensureSchema();
