@@ -3,8 +3,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  // GitHub Pages serves this project from /book-reading/. Render serves it at /.
-  base: process.env.RENDER ? "/" : "/book-reading/",
+  // Use the repository subpath only for production GitHub Pages builds.
+  // Vite's dev server is opened at /, so a subpath here makes the app entry 404.
+  base: process.env.RENDER || process.env.NODE_ENV !== "production" ? "/" : "/book-reading/",
   plugins: [react(), tailwindcss()],
 });
-
