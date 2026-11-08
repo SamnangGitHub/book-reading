@@ -1005,7 +1005,16 @@ export default function App() {
                       />
                       <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />
                       {b.isComingSoon && <span className="absolute left-2 bottom-2 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-extrabold text-amber-950 shadow">Coming soon</span>}
-                      <span className="absolute top-2 left-2 bg-indigo-950/85 px-2 py-0.5 rounded-md text-[9px] font-bold text-white">{b.pages.filter((page) => page.audioUrl).length ? `🎧` : "📖"}</span>
+                      {(() => {
+                        const narratedPages = b.pages.filter((page) => page.audioUrl).length;
+                        const hasAudio = narratedPages > 0;
+                        const label = hasAudio
+                          ? `Audio narration on ${narratedPages} of ${b.pages.length} pages`
+                          : "Text reading with browser text-to-speech available";
+                        return <span aria-label={label} title={label} className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-indigo-950/85 text-white shadow-sm">
+                          {hasAudio ? <Volume2 aria-hidden="true" className="h-4 w-4" /> : <BookOpen aria-hidden="true" className="h-4 w-4" />}
+                        </span>;
+                      })()}
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
