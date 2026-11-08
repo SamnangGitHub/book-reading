@@ -11,10 +11,12 @@ function setup() {
     properties.setProperty('SPREADSHEET_ID', spreadsheetId);
     const books = spreadsheet.getSheets()[0];
     books.setName('Books');
-    if (books.getLastRow() === 0) books.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden']);
+    if (books.getLastRow() === 0) books.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden', 'bookType']);
     else if (books.getLastColumn() < 6) books.getRange(1, 6).setValue('isHidden');
     const pages = spreadsheet.insertSheet('Pages');
     pages.appendRow(['bookId', 'pageId', 'pageNumber', 'originalText', 'khmerText', 'audioUrl', 'audioFileName']);
+    spreadsheet.insertSheet('Users').appendRow(['username', 'phone', 'passwordHash', 'updatedAt']);
+    spreadsheet.insertSheet('Progress').appendRow(['username', 'bookId', 'pageIndex', 'updatedAt']);
   }
 
   let folderId = properties.getProperty('DRIVE_FOLDER_ID');
@@ -23,6 +25,12 @@ function setup() {
     folderId = folder.getId();
     properties.setProperty('DRIVE_FOLDER_ID', folderId);
   }
+  const activeSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  const booksSheet = activeSpreadsheet.getSheetByName('Books');
+  if (booksSheet.getLastRow() === 0) booksSheet.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden', 'bookType']);
+  else if (!String(booksSheet.getRange(1, 7).getValue() || '').trim()) booksSheet.getRange(1, 7).setValue('bookType');
+  if (!activeSpreadsheet.getSheetByName('Users')) activeSpreadsheet.insertSheet('Users').appendRow(['username', 'phone', 'passwordHash', 'updatedAt']);
+  if (!activeSpreadsheet.getSheetByName('Progress')) activeSpreadsheet.insertSheet('Progress').appendRow(['username', 'bookId', 'pageIndex', 'updatedAt']);
   Logger.log('Spreadsheet: https://docs.google.com/spreadsheets/d/' + spreadsheetId);
   Logger.log('Drive folder: https://drive.google.com/drive/folders/' + folderId);
 }
@@ -39,6 +47,9 @@ function doPost(e) {
       return jsonOutput({ ok: false, error: 'Unauthorized storage request.' });
     }
     if (payload.action === 'list') return jsonOutput({ ok: true, books: readBooks_() });
+    if (payload.action === 'register' || payload.action === 'login') return jsonOutput(userAuth_(payload));
+    if (payload.action === 'progress') return jsonOutput(saveProgress_(payload));
+    if (payload.action === 'getProgress') return jsonOutput({ ok: true, progress: readProgress_(payload.username) });
     if (payload.action === 'media' && /^[\w-]{20,}$/.test(String(payload.fileId || ''))) {
       if (!isStoredMediaFile_(payload.fileId)) return jsonOutput({ ok: false, error: 'Media file is not part of the library.' });
       const file = DriveApp.getFileById(payload.fileId);
@@ -59,6 +70,54 @@ function doPost(e) {
   }
 }
 
+function userAuth_(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+  const sheet = getSpreadsheet_().getSheetByName('Users');
+  const username = String(payload.username || '').trim();
+  const phone = normalizePhone_(payload.phone);
+  if (!/^[\w .-]{2,40}$/.test(username) || !/^\+?[0-9]{7,15}$/.test(phone)) throw new Error('Enter a username and valid phone number.');
+  const rows = sheet.getDataRange().getValues();
+  const usernameIndex = rows.slice(1).findIndex(row => String(row[0]).toLowerCase() === username.toLowerCase());
+  const phoneIndex = rows.slice(1).findIndex(row => normalizePhone_(row[1]) === phone);
+  if (payload.action === 'register') {
+    if (usernameIndex >= 0 || phoneIndex >= 0) throw new Error('That username or phone number is already registered.');
+    const nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1, 1, 3).setNumberFormat('@');
+    sheet.getRange(nextRow, 1, 1, 4).setValues([[username, phone, '', new Date()]]);
+    return { ok: true, user: { username } };
+  }
+  if (usernameIndex < 0 || normalizePhone_(rows[usernameIndex + 1][1]) !== phone) throw new Error('Username or phone number is incorrect.');
+  return { ok: true, user: { username: String(rows[usernameIndex + 1][0]) } };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function normalizePhone_(value) {
+  // Sheets may have stored older phone values as numbers, dropping a leading +.
+  return String(value == null ? '' : value).trim().replace(/[^+0-9]/g, '').replace(/^\+/, '');
+}
+
+function saveProgress_(payload) {
+  const sheet = getSpreadsheet_().getSheetByName('Progress');
+  const username = String(payload.username || '');
+  const bookId = String(payload.bookId || '');
+  const pageIndex = Math.max(0, Number(payload.pageIndex) || 0);
+  if (!username || !bookId) throw new Error('Invalid reading progress.');
+  const rows = sheet.getDataRange().getValues();
+  const index = rows.slice(1).findIndex(row => row[0] === username && row[1] === bookId);
+  if (index >= 0) sheet.getRange(index + 2, 3, 1, 2).setValues([[pageIndex, new Date()]]);
+  else sheet.appendRow([username, bookId, pageIndex, new Date()]);
+  return { ok: true };
+}
+
+function readProgress_(username) {
+  return getSpreadsheet_().getSheetByName('Progress').getDataRange().getValues().slice(1)
+    .filter(row => String(row[0]) === String(username)).map(row => ({ bookId: String(row[1]), pageIndex: Number(row[2]) || 0, updatedAt: row[3] }));
+}
+
 function saveBook_(book) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -69,7 +128,7 @@ function saveBook_(book) {
     const media = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_ID'));
 
     const cover = persistDataUrl_(book.coverImage || '', book.title + '-cover', media, 'cover');
-    const bookValues = [book.id, book.title || '', book.titleKhmer || '', book.author || '', cover, Boolean(book.isHidden)];
+    const bookValues = [book.id, book.title || '', book.titleKhmer || '', book.author || '', cover, Boolean(book.isHidden), book.bookType || 'Other'];
     const existing = findRow_(booksSheet, book.id);
     if (existing) booksSheet.getRange(existing, 1, 1, bookValues.length).setValues([bookValues]);
     else booksSheet.appendRow(bookValues);
@@ -98,6 +157,7 @@ function readBooks_() {
       author: String(row[3] || ''),
       coverImage: driveMediaUrl_(String(row[4] || ''), 'cover'),
       isHidden: row[5] === true || String(row[5]).toLowerCase() === 'true',
+      bookType: String(row[6] || 'Other'),
       pages: pageRows.filter(function(page) { return String(page[0]) === id; })
         .sort(function(a, b) { return Number(a[2]) - Number(b[2]); })
         .map(function(page) { return { id: String(page[1]), pageNumber: Number(page[2]), originalText: String(page[3] || ''), khmerText: String(page[4] || ''), audioUrl: driveMediaUrl_(String(page[5] || ''), 'audio'), audioFileName: String(page[6] || '') }; })
