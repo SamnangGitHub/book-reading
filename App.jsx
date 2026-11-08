@@ -63,6 +63,24 @@ export default function App() {
   const [accountPhone, setAccountPhone] = useState("");
   const [accountMessage, setAccountMessage] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+
+  const refreshReaderHistory = async (username = readerUser?.username) => {
+    if (!username || !apiConfigured) return;
+    setHistoryBusy(true);
+    try {
+      const saved = await loadReadingProgress(username);
+      const progressMap = Object.fromEntries((saved.progress || []).map((item) => [item.bookId, Number(item.pageIndex) || 0]));
+      setReadingProgress(progressMap);
+      localStorage.setItem("khmer-reader-progress", JSON.stringify(progressMap));
+      const latest = (saved.progress || []).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+      setAccountMessage(latest ? `Reading history refreshed for ${username}.` : `Signed in as ${username}. No saved reading history yet.`);
+    } catch (error) {
+      setAccountMessage(`Could not load reading history: ${error.message}`);
+    } finally {
+      setHistoryBusy(false);
+    }
+  };
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
@@ -81,17 +99,7 @@ export default function App() {
       setReaderUser(user);
       setShowAccountForm(false);
       setAccountPhone("");
-      setAccountMessage(`Signed in as ${user.username}.`);
-      try {
-        const saved = await loadReadingProgress(user.username);
-        const progressMap = Object.fromEntries((saved.progress || []).map((item) => [item.bookId, Number(item.pageIndex) || 0]));
-        setReadingProgress(progressMap);
-        localStorage.setItem("khmer-reader-progress", JSON.stringify(progressMap));
-        const latest = (saved.progress || []).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-        if (latest) setAccountMessage(`Welcome back, ${user.username}. Your reading history is saved.`);
-      } catch (error) {
-        setAccountMessage(`Signed in as ${user.username}, but reading history could not load: ${error.message}`);
-      }
+      setAccountMessage(`Signed in as ${user.username}. Refreshing reading history…`);
     } catch (error) { setAccountMessage(error.message); }
     finally { setAccountBusy(false); }
   };
@@ -104,11 +112,7 @@ export default function App() {
 
   useEffect(() => {
     if (!readerUser?.username || !apiConfigured) return;
-    loadReadingProgress(readerUser.username).then(({ progress = [] }) => {
-      const map = Object.fromEntries(progress.map((item) => [item.bookId, Number(item.pageIndex) || 0]));
-      setReadingProgress(map);
-      localStorage.setItem("khmer-reader-progress", JSON.stringify(map));
-    }).catch((error) => setAccountMessage(`Could not load reading history: ${error.message}`));
+    void refreshReaderHistory(readerUser.username);
   }, [readerUser?.username]);
 
   const requireAdmin = async (action) => {
@@ -975,11 +979,13 @@ export default function App() {
             <form onSubmit={submitAccount} className={`w-full max-w-sm rounded-2xl p-5 shadow-xl ${currentTheme.card}`}>
               <h2 className="text-lg font-bold mb-1">{accountMode === "register" ? "Create account" : "Sign in"}</h2>
               <p className="text-xs text-slate-500 dark:text-zinc-400 mb-4">Continue as a guest, or use your username and phone number to save reading history across devices.</p>
+              {readerUser && <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-3">Signed in as {readerUser.username}</p>}
               <label className="block text-xs font-semibold mb-1">Username</label>
               <input required minLength={2} maxLength={40} value={accountUsername} onChange={(e) => setAccountUsername(e.target.value)} className="w-full mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800" />
               <label className="block text-xs font-semibold mb-1">Phone number</label>
               <input required type="tel" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} placeholder="+855..." className="w-full mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800" />
               {accountMessage && <p role="status" className="text-xs mb-3 text-indigo-600 dark:text-indigo-400">{accountMessage}</p>}
+              {readerUser && <button type="button" disabled={historyBusy} onClick={() => void refreshReaderHistory()} className="w-full py-2 text-xs text-indigo-600 dark:text-indigo-400 disabled:opacity-60">{historyBusy ? "Refreshing history…" : "Refresh reading history"}</button>}
               <button disabled={accountBusy} className="w-full py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-60">{accountBusy ? "Please wait…" : accountMode === "register" ? "Register" : "Sign in"}</button>
               <button type="button" onClick={() => { setAccountMode(accountMode === "register" ? "login" : "register"); setAccountMessage(""); }} className="w-full py-2 text-xs text-indigo-600 dark:text-indigo-400">{accountMode === "register" ? "Already registered? Sign in" : "New here? Register"}</button>
               {readerUser && <button type="button" onClick={signOutReader} className="w-full py-2 text-xs text-slate-500">Sign out</button>}
@@ -1703,7 +1709,7 @@ export default function App() {
               <Bookmark className="h-4 w-4 fill-current" /><span>Saved</span>
             </button>
             <button onClick={() => currentView === "reader" ? setShowSettingsModal(true) : (setAccountMode("login"), setAccountMessage(""), setShowAccountForm(true))} className="flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium text-slate-400">
-              <Settings className="h-4 w-4" /><span>Settings</span>
+              <Settings className="h-4 w-4" /><span>{readerUser ? "Account" : "Sign in"}</span>
             </button>
           </div>
         </nav>
