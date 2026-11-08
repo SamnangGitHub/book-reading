@@ -848,14 +848,20 @@ export default function App() {
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
   const getBookTypes = (book) => [...new Set(String(book.bookType || "Other").split(/[\/;,]+/).map((type) => type.trim()).filter(Boolean))];
   const bookTypes = [...new Set(books.flatMap(getBookTypes))].sort((a, b) => a.localeCompare(b));
+  const hasReadingHistory = (bookId) => Object.prototype.hasOwnProperty.call(readingProgress, bookId);
+  const recommendedBooks = books
+    .filter((book) => !book.isHidden && !book.isComingSoon && hasReadingHistory(book.id))
+    .sort((a, b) => (Number(readingProgress[b.id]) || 0) - (Number(readingProgress[a.id]) || 0))
+    .slice(0, 12);
   const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
     [book.title, book.titleKhmer, book.author]
       .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch)) &&
-    (libraryFilter !== "reading" || readingProgress[book.id] > 0) &&
+    (libraryFilter !== "reading" || hasReadingHistory(book.id)) &&
     (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl)) &&
-    (libraryFilter !== "text" || !book.pages.some((page) => page.audioUrl)) &&
+    (libraryFilter !== "text" || !book.isComingSoon && !book.pages.some((page) => page.audioUrl)) &&
+    (libraryFilter !== "coming" || Boolean(book.isComingSoon)) &&
     (bookTypeFilter === "all" || getBookTypes(book).includes(bookTypeFilter)) &&
-    (libraryFilter !== "favorites" || readingProgress[book.id] > 0)
+    (libraryFilter !== "favorites" || hasReadingHistory(book.id))
   );
 
   return (
@@ -947,7 +953,7 @@ export default function App() {
 
               <div className="space-y-1.5">
                 <div className="flex flex-wrap gap-1">
-                  {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio Ready"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
+                  {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio ready"], ["text", "Text only"], ["coming", "Coming soon"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
                 </div>
                 <div className="flex min-w-0 items-center gap-2">
                   {bookTypes.length > 0 && <label className="flex min-w-0 items-center gap-2 text-[10px] font-medium text-slate-500">
@@ -964,6 +970,15 @@ export default function App() {
                 </div>
               </div>
 
+              {!adminMode && libraryFilter === "all" && recommendedBooks.length > 0 && <section aria-label="Recommended from your reading history" className="space-y-2">
+                <div className="flex items-end justify-between"><div><h2 className="text-sm font-bold">Recommended for you</h2><p className="text-[10px] text-slate-500">Based on the books you’ve read</p></div></div>
+                <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Recommended books; scroll horizontally">
+                  {recommendedBooks.map((book) => <button key={book.id} type="button" onClick={() => openReader(book.id)} aria-label={`Read ${book.title}`} className="w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <img src={book.coverImage} alt="" className="aspect-[3/4] w-full object-cover" onError={(event) => { event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
+                  </button>)}
+                </div>
+              </section>}
+
               {/* Book List Header */}
               <div className="flex items-center justify-between pt-2">
                 <h2 className="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-zinc-400">
@@ -977,7 +992,7 @@ export default function App() {
               </div>
 
               {/* Grid of Books */}
-              <div className={libraryLayout === "grid" ? "grid grid-cols-2 lg:grid-cols-4 gap-3" : "grid grid-cols-1 gap-2"}>
+              <div className={libraryLayout === "grid" ? "grid grid-cols-1 sm:grid-cols-2 gap-2" : "grid grid-cols-1 gap-3"}>
                 {isLoadingBooks ? (
                   Array.from({ length: 4 }, (_, index) => (
                     <div key={index} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -988,12 +1003,12 @@ export default function App() {
                 ) : filteredBooks.length ? filteredBooks.map((b) => (
                   <div
                     key={b.id}
-                    className="group bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col relative"
+                    className={`group bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition relative ${libraryLayout === "grid" ? "flex flex-row" : "flex flex-col"}`}
                   >
                     {/* Book Cover */}
                     <div
                       onClick={() => { if (!b.isComingSoon) openReader(b.id); }}
-                      className={`aspect-[3/4] w-full relative bg-slate-100 overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
+                      className={`${libraryLayout === "grid" ? "w-20 h-28 shrink-0" : "aspect-[3/4] w-full"} relative bg-slate-100 overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
                     >
                       <img
                         src={b.coverImage}
@@ -1004,9 +1019,9 @@ export default function App() {
                             "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
                         }}
                       />
-                      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />
-                      {b.isComingSoon && <span className="absolute left-2 bottom-2 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-extrabold text-amber-950 shadow">Coming soon</span>}
-                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
+                      {libraryLayout !== "grid" && <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />}
+                      {b.isComingSoon && <span className={`absolute left-1 bottom-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[8px] font-extrabold text-amber-950 shadow ${libraryLayout !== "grid" ? "left-2 bottom-2 px-2.5 py-1 text-[10px]" : ""}`}>Coming soon</span>}
+                      <div className="absolute top-1 right-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-full text-[9px] text-white flex items-center space-x-1">
                         {b.pages.some((page) => page.audioUrl) && <span aria-label={`Audio narration on ${b.pages.filter((page) => page.audioUrl).length} of ${b.pages.length} pages`} title={`Audio narration on ${b.pages.filter((page) => page.audioUrl).length} of ${b.pages.length} pages`} className="relative inline-flex h-4 w-4 items-center justify-center text-white">
                           <Headphones aria-hidden="true" className="h-4 w-4" />
                           <Play aria-hidden="true" className="absolute h-1.5 w-1.5 fill-current" />
@@ -1014,11 +1029,11 @@ export default function App() {
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
                       </div>
-                      {!b.isComingSoon && <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-6 h-6 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3 h-3 fill-current" /></button>}
+                      {libraryLayout !== "grid" && !b.isComingSoon && <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-6 h-6 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3 h-3 fill-current" /></button>}
                     </div>
 
                     {/* Book Details */}
-                    <div className="p-2.5 flex flex-col flex-1 justify-between">
+                    <div className={`p-2.5 flex flex-col flex-1 justify-between min-w-0 ${libraryLayout === "grid" ? "py-2" : ""}`}>
                       <div onClick={() => { if (!b.isComingSoon) openReader(b.id); }} className={b.isComingSoon ? "" : "cursor-pointer"}>
                         <h3 className="text-[11px] font-bold line-clamp-1 group-hover:text-indigo-600 transition">
                           {b.title}
