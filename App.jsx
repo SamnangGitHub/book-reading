@@ -31,7 +31,11 @@ import {
   ArrowUp,
   ArrowDown,
   PlusCircle,
-  Search
+  Search,
+  Menu,
+  X,
+  LayoutGrid,
+  List
 } from "lucide-react";
 
 export default function App() {
@@ -44,6 +48,9 @@ export default function App() {
   const [isLoadingBooks, setIsLoadingBooks] = useState(apiConfigured);
   const [bookSearch, setBookSearch] = useState("");
   const [libraryFilter, setLibraryFilter] = useState("all");
+  const [libraryLayout, setLibraryLayout] = useState("grid");
+  const [showMainMenu, setShowMainMenu] = useState(false);
+  const [pageJump, setPageJump] = useState("1");
   const [readingProgress, setReadingProgress] = useState(() => {
     try { return JSON.parse(localStorage.getItem("khmer-reader-progress") || "{}"); } catch { return {}; }
   });
@@ -252,6 +259,8 @@ export default function App() {
     }
     setAudioPlaybackError("");
   }, [currentPageIndex]);
+
+  useEffect(() => setPageJump(String(currentPageIndex + 1)), [currentPageIndex]);
 
   // Audio Play / Pause Toggle
   const togglePlayAudio = () => {
@@ -766,13 +775,23 @@ export default function App() {
       border: "border-zinc-800",
       badge: "bg-zinc-800 text-zinc-300 border-zinc-700",
       highlight: "bg-zinc-800/80 text-zinc-100 border-l-4 border-indigo-500"
+    },
+    reading: {
+      bg: "bg-amber-50",
+      card: "bg-[#fff8e8]",
+      text: "text-amber-950",
+      subtext: "text-amber-800",
+      accent: "text-amber-800",
+      border: "border-amber-200",
+      badge: "bg-amber-100 text-amber-900 border-amber-200",
+      highlight: "bg-amber-100/80 text-amber-950 border-l-4 border-amber-600"
     }
   };
 
   const currentTheme = themeStyles[theme];
   useEffect(() => {
     localStorage.setItem("khmer-reader-theme", theme);
-    document.documentElement.style.background = theme === "dark" ? "#09090b" : "#f8fafc";
+    document.documentElement.style.background = theme === "dark" ? "#09090b" : theme === "reading" ? "#fbf0d9" : "#f8fafc";
   }, [theme]);
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
   const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
@@ -788,7 +807,7 @@ export default function App() {
       className={`min-h-screen ${currentTheme.bg} ${currentTheme.text} flex justify-center font-sans transition-colors duration-200 antialiased`}
     >
       {/* Mobile Wrapper with fixed max-width for phone proportions */}
-      <div className={`w-full max-w-5xl min-h-screen flex flex-col relative ${theme === "dark" ? "bg-zinc-950" : "bg-slate-50"} shadow-2xl border-x border-black/5`}>
+      <div className={`w-full max-w-5xl min-h-screen flex flex-col relative ${theme === "dark" ? "bg-zinc-950" : theme === "reading" ? "bg-[#fbf0d9]" : "bg-slate-50"} shadow-2xl border-x border-black/5`}>
         
         {/* ========================================================= */}
         {/* VIEW 1: BOOK LIBRARY                                      */}
@@ -809,18 +828,26 @@ export default function App() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "night"} theme`} title={`Switch to ${theme === "dark" ? "light" : "night"} theme`} className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${theme === "dark" ? "border-zinc-700 bg-zinc-900 text-amber-300" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
-                  {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                <button onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "reading" : "dark")} aria-label={`Current theme: ${theme}. Change theme`} title={`Theme: ${theme}`} className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${theme === "dark" ? "border-zinc-700 bg-zinc-900 text-amber-300" : "border-slate-200 bg-white/80 text-slate-600"}`}>
+                  {theme === "dark" ? <Moon className="w-4 h-4" /> : theme === "reading" ? <Coffee className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                 </button>
-                <button
-                onClick={async () => { if (await requireAdmin("add books")) openCreateNewBook(); }}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Upload</span>
-              </button>
+                <button onClick={() => setShowMainMenu((open) => !open)} aria-label={showMainMenu ? "Close menu" : "Open menu"} aria-expanded={showMainMenu} className={`h-9 w-9 rounded-full border flex items-center justify-center ${theme === "dark" ? "border-zinc-700 bg-zinc-900" : "border-slate-200 bg-white/80"}`}>
+                  {showMainMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                </button>
               </div>
             </header>
+
+            {showMainMenu && <div className={`sticky top-[61px] z-20 border-b px-4 py-3 shadow-sm ${currentTheme.card} ${currentTheme.border}`}>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <button onClick={() => { setLibraryFilter("all"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Library</button>
+                <button onClick={() => { setLibraryFilter("audio"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Audio ready</button>
+                <button onClick={() => { setLibraryFilter("favorites"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Saved books</button>
+                <button onClick={() => { setAccountMode("login"); setAccountMessage(""); setShowAccountForm(true); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">{readerUser ? `Account · ${readerUser.username}` : "Sign in / Account"}</button>
+                <button onClick={async () => { setShowMainMenu(false); if (await requireAdmin("add books")) openCreateNewBook(); }} className="col-span-2 rounded-lg bg-indigo-600 px-3 py-2 text-left font-semibold text-white"><Plus className="mr-1 inline h-4 w-4" />Upload a book</button>
+                {adminMode && <button onClick={() => { setShowHiddenBooks((hidden) => !hidden); setShowMainMenu(false); }} className="col-span-2 rounded-lg border px-3 py-2 text-left">{showHiddenBooks ? "Show available books" : "Show hidden books"}</button>}
+                <div className="col-span-2 flex items-center gap-2 border-t pt-2"><span className="text-slate-500">Theme</span>{[["light","Light"],["dark","Black"],["reading","Reading"]].map(([value,label]) => <button key={value} onClick={() => setTheme(value)} className={`rounded-md border px-2.5 py-1.5 ${theme === value ? "border-indigo-500 text-indigo-600" : ""}`}>{label}</button>)}</div>
+              </div>
+            </div>}
 
             {/* Content List */}
             <div className="p-4 space-y-4 flex-1">
@@ -835,25 +862,28 @@ export default function App() {
                   <p className="text-xs text-indigo-100 mt-1 max-w-lg">
                     Read side-by-side or in Khmer with native page audio narration.
                   </p>
-                  <div className="flex items-center gap-3 mt-4 text-[10px] text-indigo-100"><button onClick={() => books[0] && openReader(books[0].id)} className="rounded-lg bg-white px-3 py-1.5 text-indigo-700 font-semibold">▶ Try Demo Reader</button><span>219+ Voice Models</span></div>
+                  <div className="mt-4 text-[10px] text-indigo-100">219+ Voice Models</div>
                 </div>
                 <Sparkles className="absolute right-3 bottom-2 w-20 h-20 text-white/10 pointer-events-none" />
               </div>
 
-              <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-400 focus-within:border-indigo-400">
-                <Search className="w-4 h-4 shrink-0" />
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/90 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-400 focus-within:border-indigo-400">
+                <Search className="w-3.5 h-3.5 shrink-0" />
                 <input
                   type="search"
                   value={bookSearch}
                   onChange={(e) => setBookSearch(e.target.value)}
                   placeholder="Search books by title, author or Khmer..."
                   aria-label="Search books by title, author or Khmer"
-                  className="w-full bg-transparent text-sm text-slate-800 dark:text-zinc-100 outline-none placeholder:text-slate-400"
+                  className="w-full bg-transparent text-xs text-slate-800 dark:text-zinc-100 outline-none placeholder:text-slate-400"
                 />
               </label>
 
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {[['all', `All Books (${books.filter((b) => !b.isHidden).length})`], ['reading', 'Reading Now'], ['audio', 'Audio Ready'], ['favorites', 'Favorites']].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 px-3 py-1.5 rounded-lg border text-[10px] font-semibold ${libraryFilter === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}>{label}</button>)}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex gap-1.5 overflow-x-auto">
+                  {[['all', `All (${books.filter((b) => !b.isHidden).length})`], ['reading', 'Reading'], ['audio', 'Audio']].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 px-2.5 py-1 rounded-md border text-[10px] font-semibold ${libraryFilter === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white/80 text-slate-600 border-slate-200'}`}>{label}</button>)}
+                </div>
+                <div className="flex rounded-md border bg-white/80 p-0.5"><button aria-label="Grid view" onClick={() => setLibraryLayout("grid")} className={`rounded p-1 ${libraryLayout === "grid" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><LayoutGrid className="h-3.5 w-3.5" /></button><button aria-label="List view" onClick={() => setLibraryLayout("list")} className={`rounded p-1 ${libraryLayout === "list" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><List className="h-3.5 w-3.5" /></button></div>
               </div>
 
               {/* Book List Header */}
@@ -869,7 +899,7 @@ export default function App() {
               </div>
 
               {/* Grid of Books */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+              <div className={libraryLayout === "grid" ? "grid grid-cols-2 lg:grid-cols-4 gap-3" : "grid grid-cols-1 gap-2"}>
                 {isLoadingBooks ? (
                   Array.from({ length: 4 }, (_, index) => (
                     <div key={index} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -1037,9 +1067,12 @@ export default function App() {
                 <h2 className="text-xs font-semibold uppercase tracking-wider line-clamp-1 opacity-75">
                   {currentBook?.title}
                 </h2>
-                <div className="text-[11px] font-bold text-indigo-500">
-                  ទំព័រ {currentPageIndex + 1} / {currentBook?.pages.length}
-                </div>
+                <form className="mt-0.5 flex items-center justify-center gap-1 text-[11px]" onSubmit={(event) => { event.preventDefault(); const target = Number(pageJump); if (Number.isInteger(target) && target >= 1 && target <= (currentBook?.pages.length || 0)) setCurrentPageIndex(target - 1); }}>
+                  <span className="font-bold text-indigo-500">ទំព័រ</span>
+                  <input aria-label="Go to page number" type="number" min="1" max={currentBook?.pages.length || 1} value={pageJump} onChange={(event) => setPageJump(event.target.value)} className="w-12 rounded border border-slate-200 bg-transparent px-1 py-0.5 text-center font-bold text-indigo-600 outline-none focus:border-indigo-500" />
+                  <span className="text-slate-500">/ {currentBook?.pages.length}</span>
+                  <button type="submit" className="rounded bg-indigo-50 px-1.5 py-0.5 font-semibold text-indigo-600">Go</button>
+                </form>
               </div>
 
               {/* Action Buttons: Edit Book & Reader Settings */}
@@ -1279,7 +1312,7 @@ export default function App() {
                     <label className="text-xs font-semibold text-slate-500 uppercase">
                       ស្បែកពណ៌ (Theme)
                     </label>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="grid grid-cols-3 gap-2 mt-2">
                       <button
                         onClick={() => setTheme("light")}
                         className={`py-2 px-3 rounded-xl border flex items-center justify-center space-x-1.5 text-xs font-semibold ${
@@ -1301,6 +1334,17 @@ export default function App() {
                       >
                         <Moon className="w-4 h-4" />
                         <span>Dark</span>
+                      </button>
+                      <button
+                        onClick={() => setTheme("reading")}
+                        className={`py-2 px-2 rounded-xl border flex items-center justify-center space-x-1.5 text-xs font-semibold ${
+                          theme === "reading"
+                            ? "border-amber-600 bg-[#fff8e8] text-amber-900 shadow-sm"
+                            : "border-amber-200 bg-amber-50 text-amber-800"
+                        }`}
+                      >
+                        <Coffee className="w-4 h-4" />
+                        <span>Reading</span>
                       </button>
                     </div>
                   </div>
@@ -1684,22 +1728,6 @@ export default function App() {
           </div>
         )}
 
-        <nav aria-label="Mobile navigation" className={`fixed bottom-0 left-1/2 z-40 w-full max-w-5xl -translate-x-1/2 border-t px-3 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl ${theme === "dark" ? "border-zinc-800 bg-zinc-950/95" : "border-slate-200 bg-white/95"}`}>
-          <div className="grid h-[64px] grid-cols-4 gap-1">
-            <button onClick={() => { setCurrentView("library"); setLibraryFilter("all"); }} className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${currentView === "library" && libraryFilter === "all" ? "text-indigo-600" : "text-slate-400 dark:text-zinc-500"}`} aria-current={currentView === "library" && libraryFilter === "all" ? "page" : undefined}>
-              <BookOpen className="h-[18px] w-[18px]" /><span>Library</span>
-            </button>
-            <button onClick={() => { setCurrentView("library"); setLibraryFilter("audio"); }} className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${currentView === "library" && libraryFilter === "audio" ? "text-indigo-600" : "text-slate-400 dark:text-zinc-500"}`} aria-current={currentView === "library" && libraryFilter === "audio" ? "page" : undefined}>
-              <Volume2 className="h-[18px] w-[18px]" /><span>Audio</span>
-            </button>
-            <button onClick={() => { setCurrentView("library"); setLibraryFilter("favorites"); }} className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${currentView === "library" && libraryFilter === "favorites" ? "text-indigo-600" : "text-slate-400 dark:text-zinc-500"}`} aria-current={currentView === "library" && libraryFilter === "favorites" ? "page" : undefined}>
-              <Bookmark className="h-[18px] w-[18px]" /><span>Saved</span>
-            </button>
-            <button onClick={() => currentView === "reader" ? setShowSettingsModal(true) : (setAccountMode("login"), setAccountMessage(""), setShowAccountForm(true))} className="flex flex-col items-center justify-center gap-1 text-[10px] font-semibold text-slate-400 dark:text-zinc-500">
-              <Settings className="h-[18px] w-[18px]" /><span>{readerUser ? "Account" : "Guest"}</span>
-            </button>
-          </div>
-        </nav>
       </div>
     </div>
   );
