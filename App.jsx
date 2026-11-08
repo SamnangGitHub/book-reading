@@ -72,6 +72,38 @@ export default function App() {
   const [accountMessage, setAccountMessage] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
   const [historyBusy, setHistoryBusy] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installMessage, setInstallMessage] = useState("");
+
+  useEffect(() => {
+    const handleInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    const handleInstalled = () => {
+      setInstallPrompt(null);
+      setInstallMessage("Khmer Reader was added to your home screen.");
+    };
+    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
+  }, []);
+
+  const installApp = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const result = await installPrompt.userChoice;
+      setInstallMessage(result.outcome === "accepted" ? "Khmer Reader was added to your home screen." : "You can add Khmer Reader from your browser menu anytime.");
+      setInstallPrompt(null);
+      return;
+    }
+    setInstallMessage(/iphone|ipad|ipod/i.test(navigator.userAgent)
+      ? "To install: tap Share, then Add to Home Screen."
+      : "To install: open your browser menu and choose Install app or Add to Home screen.");
+  };
 
   const refreshReaderHistory = async (username = readerUser?.username) => {
     if (!username || !apiConfigured) return;
@@ -820,6 +852,7 @@ export default function App() {
       .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch)) &&
     (libraryFilter !== "reading" || readingProgress[book.id] > 0) &&
     (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl)) &&
+    (libraryFilter !== "text" || !book.pages.some((page) => page.audioUrl)) &&
     (bookTypeFilter === "all" || getBookTypes(book).includes(bookTypeFilter)) &&
     (libraryFilter !== "favorites" || readingProgress[book.id] > 0)
   );
@@ -853,6 +886,9 @@ export default function App() {
                 <button onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "reading" : "dark")} aria-label={`Current theme: ${theme}. Change theme`} title={`Theme: ${theme}`} className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${theme === "dark" ? "border-zinc-700 bg-zinc-900 text-amber-300" : "border-slate-200 bg-white/80 text-slate-600"}`}>
                   {theme === "dark" ? <Moon className="w-4 h-4" /> : theme === "reading" ? <Coffee className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                 </button>
+                <button onClick={() => window.location.reload()} aria-label="Refresh app" title="Refresh app" className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${theme === "dark" ? "border-zinc-700 bg-zinc-900 text-zinc-300" : "border-slate-200 bg-white/80 text-slate-600"}`}>
+                  <RotateCcw className="w-4 h-4" />
+                </button>
                 <button onClick={() => setShowMainMenu((open) => !open)} aria-label={showMainMenu ? "Close menu" : "Open menu"} aria-expanded={showMainMenu} className={`h-9 w-9 rounded-full border flex items-center justify-center ${theme === "dark" ? "border-zinc-700 bg-zinc-900" : "border-slate-200 bg-white/80"}`}>
                   {showMainMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
                 </button>
@@ -863,13 +899,21 @@ export default function App() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <button onClick={() => { setLibraryFilter("all"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Library</button>
                 <button onClick={() => { setLibraryFilter("audio"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Audio ready</button>
+                <button onClick={() => { setLibraryFilter("text"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Text reading</button>
                 <button onClick={() => { setLibraryFilter("favorites"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Saved books</button>
                 <button onClick={() => { setAccountMode("login"); setAccountMessage(""); setShowAccountForm(true); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">{readerUser ? `Account · ${readerUser.username}` : "Sign in / Account"}</button>
+                <button onClick={() => { setShowMainMenu(false); void installApp(); }} className="rounded-lg border px-3 py-2 text-left">Add to home screen</button>
                 <button onClick={async () => { setShowMainMenu(false); if (await requireAdmin("add books")) openCreateNewBook(); }} className="col-span-2 rounded-lg bg-indigo-600 px-3 py-2 text-left font-semibold text-white"><Plus className="mr-1 inline h-4 w-4" />Upload a book</button>
                 {adminMode && <button onClick={() => { setShowHiddenBooks((hidden) => !hidden); setShowMainMenu(false); }} className="col-span-2 rounded-lg border px-3 py-2 text-left">{showHiddenBooks ? "Show available books" : "Show hidden books"}</button>}
                 <div className="col-span-2 flex items-center gap-2 border-t pt-2"><span className="text-slate-500">Theme</span>{[["light","Light"],["dark","Black"],["reading","Reading"]].map(([value,label]) => <button key={value} onClick={() => setTheme(value)} className={`rounded-md border px-2.5 py-1.5 ${theme === value ? "border-indigo-500 text-indigo-600" : ""}`}>{label}</button>)}</div>
               </div>
             </div>}
+
+            {!readerUser && <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-xs text-indigo-950">
+              <p><strong>Keep your place on every device.</strong> Sign in to sync your reading progress.</p>
+              <button onClick={() => { setAccountMode("register"); setAccountMessage(""); setShowAccountForm(true); }} className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white">Save progress</button>
+            </div>}
+            {installMessage && <div role="status" className="mx-4 mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><span>{installMessage}</span><button aria-label="Dismiss install message" onClick={() => setInstallMessage("")}><X className="h-4 w-4" /></button></div>}
 
             {/* Content List */}
             <div className="p-4 space-y-4 flex-1">
@@ -961,7 +1005,7 @@ export default function App() {
                       />
                       <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />
                       {b.isComingSoon && <span className="absolute left-2 bottom-2 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-extrabold text-amber-950 shadow">Coming soon</span>}
-                      {b.pages.some((page) => page.audioUrl) && <span className="absolute top-2 left-2 bg-indigo-600/90 px-2 py-0.5 rounded-md text-[9px] font-bold text-white">Dual Sync</span>}
+                      <span className="absolute top-2 left-2 bg-indigo-950/85 px-2 py-0.5 rounded-md text-[9px] font-bold text-white">{b.pages.filter((page) => page.audioUrl).length ? `🎧 Audio · ${b.pages.filter((page) => page.audioUrl).length}/${b.pages.length} pages` : "📖 Text reading"}</span>
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
@@ -1112,6 +1156,7 @@ export default function App() {
 
               {/* Action Buttons: Edit Book & Reader Settings */}
               <div className="flex items-center space-x-1">
+                <button onClick={() => window.location.reload()} aria-label="Refresh app" title="Refresh app" className="p-2 rounded-full hover:bg-black/5 active:scale-95 transition"><RotateCcw className="w-4 h-4" /></button>
                 <button
                   onClick={() => {
                     if (isPlaying && audioRef.current) {
@@ -1427,7 +1472,7 @@ export default function App() {
                   {editingBookId ? "កែសម្រួលសៀវភៅ (Edit Book)" : "បង្កើតសៀវភៅថ្មី (New Book)"}
                 </h2>
                 {editingBookId && (
-                  <p className="text-[10px] text-indigo-600 font-medium">Open a page to edit it. Save or delete pages individually.</p>
+                  <p className="text-[10px] text-indigo-600 font-medium">{newBook.pages.filter((page) => page.audioUrl).length} of {newBook.pages.length} pages have audio · pages without audio use text-to-speech. Open a page to edit it.</p>
                 )}
                 {saveStatus && <p className="text-[10px] text-indigo-600" role="status" aria-live="polite">{saveStatus}</p>}
               </div>
@@ -1438,6 +1483,7 @@ export default function App() {
               >
                 {isSavingBook ? "Saving…" : editingBookId ? "Save Book Info" : "រក្សាទុក (Save)"}
               </button>
+              <button type="button" onClick={() => window.location.reload()} aria-label="Refresh app" title="Refresh app" className="ml-2 rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800"><RotateCcw className="h-4 w-4" /></button>
             </div>
 
             {/* Form Scroll Area */}
@@ -1677,6 +1723,9 @@ export default function App() {
 
                       {/* Page Voice Audio File Upload */}
                       <div className="pt-1">
+                        <p className={`mb-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${page.audioUrl ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300"}`}>
+                          {page.audioUrl ? "Audio narration attached · readers can listen" : "Text only · readers can use browser text-to-speech"}
+                        </p>
                         <label className="text-xs font-semibold text-slate-600 dark:text-zinc-300 block mb-1.5">
                           សំឡេងអានសម្រាប់ទំព័រនេះ (Page Audio Narration)
                         </label>
