@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi, userAccount, saveReadingProgress, loadReadingProgress } from "./src/bookApi.js";
+import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi } from "./src/bookApi.js";
 import {
   BookOpen,
   Plus,
@@ -50,10 +50,6 @@ export default function App() {
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
   const [showHiddenBooks, setShowHiddenBooks] = useState(false);
-  const [readerUser, setReaderUser] = useState(() => { try { return JSON.parse(localStorage.getItem("khmer-reader-user") || "null"); } catch { return null; } });
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [accountMode, setAccountMode] = useState("login");
-  const [accountMessage, setAccountMessage] = useState("");
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
@@ -116,29 +112,6 @@ export default function App() {
       .finally(() => { if (!cancelled) setIsLoadingBooks(false); });
     return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => {
-    if (!readerUser || !apiConfigured) return;
-    loadReadingProgress(readerUser.username).then(({ progress = [] }) => {
-      const latest = progress.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-      if (latest) setBooks((items) => items.map((book) => ({ ...book, readingProgress: latest.bookId === book.id ? latest.pageIndex : book.readingProgress })));
-    }).catch(() => {});
-  }, [readerUser]);
-
-  useEffect(() => {
-    if (!readerUser || currentView !== "reader" || !currentBook || !apiConfigured) return;
-    const timer = window.setTimeout(() => saveReadingProgress(readerUser.username, currentBook.id, currentPageIndex).catch(() => {}), 700);
-    return () => window.clearTimeout(timer);
-  }, [readerUser, currentView, currentBook?.id, currentPageIndex]);
-
-  const submitAccount = async (event) => {
-    event.preventDefault(); setAccountMessage("Working…");
-    try {
-      const form = new FormData(event.currentTarget);
-      const { user } = await userAccount(accountMode, { username: form.get("username"), phone: form.get("phone") });
-      setReaderUser(user); localStorage.setItem("khmer-reader-user", JSON.stringify(user)); setAccountOpen(false); setAccountMessage("");
-    } catch (error) { setAccountMessage(error.message); }
-  };
 
   // Active Book Data
   const currentBook = books.find((b) => b.id === activeBookId) || books[0];
@@ -267,7 +240,7 @@ export default function App() {
   // Switch to Reader View
   const openReader = (bookId) => {
     setActiveBookId(bookId);
-    setCurrentPageIndex(books.find((book) => book.id === bookId)?.readingProgress || 0);
+    setCurrentPageIndex(0);
     setCurrentView("reader");
   };
 
@@ -745,7 +718,7 @@ export default function App() {
       className={`min-h-screen ${currentTheme.bg} ${currentTheme.text} flex justify-center font-sans transition-colors duration-200 antialiased`}
     >
       {/* Mobile Wrapper with fixed max-width for phone proportions */}
-      <div className="w-full max-w-[448px] min-h-screen flex flex-col relative shadow-2xl border-x border-black/5 bg-slate-50">
+      <div className="w-full max-w-md min-h-screen flex flex-col relative shadow-2xl border-x border-black/5">
         
         {/* ========================================================= */}
         {/* VIEW 1: BOOK LIBRARY                                      */}
@@ -753,7 +726,7 @@ export default function App() {
         {currentView === "library" && (
           <div className="flex-1 flex flex-col pb-20">
             {/* Header */}
-            <header className="sticky top-0 z-20 backdrop-blur-md bg-white/95 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 px-4 py-3 flex items-center justify-between">
+            <header className="sticky top-0 z-20 backdrop-blur-md bg-white/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 px-5 py-4 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
                   <Languages className="w-5 h-5" />
@@ -766,20 +739,20 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2"><button onClick={() => setAccountOpen(true)} className="px-2.5 py-2 text-[11px] font-semibold text-indigo-700 bg-indigo-50 rounded-full">{readerUser?.username || "Sign in"}</button><button
+              <button
                 onClick={async () => { if (await requireAdmin("add books")) openCreateNewBook(); }}
                 className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Upload</span>
-              </button></div>
+              </button>
             </header>
 
             {/* Content List */}
             <div className="p-4 space-y-4 flex-1">
               {storageMessage && <p className="text-[11px] text-rose-600 dark:text-rose-400" role="status">{storageMessage}</p>}
               {/* Banner */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 text-white shadow-lg relative overflow-hidden">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg relative overflow-hidden">
                 <div className="relative z-10">
                   <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[11px] font-medium backdrop-blur-sm">
                     Dual Language & Voice
@@ -790,7 +763,6 @@ export default function App() {
                   </p>
                 </div>
                 <Sparkles className="absolute right-3 bottom-2 w-20 h-20 text-white/10 pointer-events-none" />
-                <button onClick={() => openReader(filteredBooks[0]?.id)} className="relative z-10 mt-2 px-3 py-1.5 rounded-lg bg-white text-indigo-700 text-[11px] font-semibold">▶ Try Demo Reader</button>
               </div>
 
               <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-400 focus-within:border-indigo-400">
@@ -804,9 +776,6 @@ export default function App() {
                   className="w-full bg-transparent text-sm text-slate-800 dark:text-zinc-100 outline-none placeholder:text-slate-400"
                 />
               </label>
-              {readerUser && [...books].filter((book) => !book.isHidden).sort((a,b) => Number(b.readingProgress ?? -1)-Number(a.readingProgress ?? -1)).some(book => book.readingProgress != null) && <button onClick={() => openReader([...books].filter(book => book.readingProgress != null).sort((a,b) => Number(b.readingProgress)-Number(a.readingProgress))[0].id)} className="w-full p-3 rounded-xl bg-white border border-indigo-100 text-left text-xs text-indigo-700 font-semibold">Continue reading →</button>}
-
-              <div className="flex gap-2 overflow-x-auto text-[11px]"><button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white">All Books ({filteredBooks.length})</button><button onClick={() => { if(readerUser) setBooks(items=>items.filter(book=>book.readingProgress!=null)); else setAccountOpen(true); }} className="px-3 py-1.5 rounded-lg border bg-white text-slate-600">Reading Now</button><button onClick={() => setBooks(items=>items.filter(book=>book.pages?.some(page=>page.audioUrl)))} className="px-3 py-1.5 rounded-lg border bg-white text-slate-600">Audio Ready</button><button className="px-3 py-1.5 rounded-lg border bg-white text-slate-600">Favorites</button></div>
 
               {/* Book List Header */}
               <div className="flex items-center justify-between pt-2">
@@ -1619,7 +1588,6 @@ export default function App() {
           </div>
         )}
       </div>
-      {accountOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><form onSubmit={submitAccount} className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-3"><div className="flex justify-between items-center"><h2 className="text-lg font-bold text-slate-900">{accountMode === "register" ? "Create your reader account" : "Welcome back"}</h2><button type="button" onClick={() => setAccountOpen(false)} className="text-slate-500">✕</button></div><input name="username" required minLength={2} placeholder="Username" className="w-full rounded-lg border p-3 text-sm text-slate-900"/><input name="phone" required type="tel" placeholder="Phone number" className="w-full rounded-lg border p-3 text-sm text-slate-900"/><p className="text-xs text-slate-500">Use your username and phone number to access your account. Account details and reading progress are stored in your Google Drive library.</p>{accountMessage&&<p role="status" className="text-xs text-rose-600">{accountMessage}</p>}<button className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white">{accountMode === "register" ? "Register" : "Log in"}</button><button type="button" onClick={() => {setAccountMode(mode=>mode === "login" ? "register" : "login");setAccountMessage("");}} className="w-full py-2 text-xs text-indigo-700">{accountMode === "register" ? "Already registered? Log in" : "New here? Create an account"}</button></form></div>}
     </div>
   );
 }
