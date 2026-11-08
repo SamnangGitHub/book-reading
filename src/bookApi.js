@@ -49,3 +49,13 @@ export async function deleteBook(bookId, token) {
   });
   return result.books;
 }
+
+export async function userAccount(action, credentials) {
+  return request(`/api/users/${action}`, { method: "POST", body: JSON.stringify(credentials) });
+}
+export async function saveReadingProgress(username, bookId, pageIndex) {
+  return request("/api/progress", { method: "POST", body: JSON.stringify({ username, bookId, pageIndex }) });
+}
+export async function loadReadingProgress(username) {
+  return request(`/api/progress/${encodeURIComponent(username)}`);
+}
