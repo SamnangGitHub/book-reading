@@ -946,7 +946,7 @@ export default function App() {
 
               <div className="space-y-1.5">
                 <div className="flex flex-wrap gap-1">
-                  {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio Ready"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[3px] font-semibold transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
+                  {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio Ready"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
                 </div>
                 <div className="flex min-w-0 items-center gap-2">
                   {bookTypes.length > 0 && <label className="flex min-w-0 items-center gap-2 text-[10px] font-medium text-slate-500">
@@ -1008,11 +1008,10 @@ export default function App() {
                       {(() => {
                         const narratedPages = b.pages.filter((page) => page.audioUrl).length;
                         const hasAudio = narratedPages > 0;
-                        const label = hasAudio
-                          ? `Audio narration on ${narratedPages} of ${b.pages.length} pages`
-                          : "Text reading with browser text-to-speech available";
+                        if (!hasAudio) return null;
+                        const label = `Audio narration on ${narratedPages} of ${b.pages.length} pages`;
                         return <span aria-label={label} title={label} className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-indigo-950/85 text-white shadow-sm">
-                          {hasAudio ? <Volume2 aria-hidden="true" className="h-4 w-4" /> : <BookOpen aria-hidden="true" className="h-4 w-4" />}
+                          <Volume2 aria-hidden="true" className="h-4 w-4" />
                         </span>;
                       })()}
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
@@ -1831,3 +1830,4 @@ export default function App() {
     </div>
   );
 }
+
