@@ -11,8 +11,12 @@ function setup() {
     properties.setProperty('SPREADSHEET_ID', spreadsheetId);
     const books = spreadsheet.getSheets()[0];
     books.setName('Books');
-    if (books.getLastRow() === 0) books.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden', 'bookType']);
-    else if (books.getLastColumn() < 6) books.getRange(1, 6).setValue('isHidden');
+    if (books.getLastRow() === 0) books.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden', 'bookType', 'isComingSoon']);
+    else {
+      if (books.getLastColumn() < 6) books.getRange(1, 6).setValue('isHidden');
+      if (books.getLastColumn() < 7) books.getRange(1, 7).setValue('bookType');
+      if (books.getLastColumn() < 8) books.getRange(1, 8).setValue('isComingSoon');
+    }
     const pages = spreadsheet.insertSheet('Pages');
     pages.appendRow(['bookId', 'pageId', 'pageNumber', 'originalText', 'khmerText', 'audioUrl', 'audioFileName']);
     spreadsheet.insertSheet('Users').appendRow(['username', 'phone', 'passwordHash', 'updatedAt']);
@@ -27,8 +31,11 @@ function setup() {
   }
   const activeSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
   const booksSheet = activeSpreadsheet.getSheetByName('Books');
-  if (booksSheet.getLastRow() === 0) booksSheet.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden', 'bookType']);
-  else if (!String(booksSheet.getRange(1, 7).getValue() || '').trim()) booksSheet.getRange(1, 7).setValue('bookType');
+  if (booksSheet.getLastRow() === 0) booksSheet.appendRow(['bookId', 'title', 'titleKhmer', 'author', 'coverImage', 'isHidden', 'bookType', 'isComingSoon']);
+  else {
+    if (!String(booksSheet.getRange(1, 7).getValue() || '').trim()) booksSheet.getRange(1, 7).setValue('bookType');
+    if (!String(booksSheet.getRange(1, 8).getValue() || '').trim()) booksSheet.getRange(1, 8).setValue('isComingSoon');
+  }
   if (!activeSpreadsheet.getSheetByName('Users')) activeSpreadsheet.insertSheet('Users').appendRow(['username', 'phone', 'passwordHash', 'updatedAt']);
   if (!activeSpreadsheet.getSheetByName('Progress')) activeSpreadsheet.insertSheet('Progress').appendRow(['username', 'bookId', 'pageIndex', 'updatedAt']);
   Logger.log('Spreadsheet: https://docs.google.com/spreadsheets/d/' + spreadsheetId);
@@ -128,7 +135,7 @@ function saveBook_(book) {
     const media = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_ID'));
 
     const cover = persistDataUrl_(book.coverImage || '', book.title + '-cover', media, 'cover');
-    const bookValues = [book.id, book.title || '', book.titleKhmer || '', book.author || '', cover, Boolean(book.isHidden), book.bookType || 'Other'];
+    const bookValues = [book.id, book.title || '', book.titleKhmer || '', book.author || '', cover, Boolean(book.isHidden), book.bookType || 'Other', Boolean(book.isComingSoon)];
     const existing = findRow_(booksSheet, book.id);
     if (existing) booksSheet.getRange(existing, 1, 1, bookValues.length).setValues([bookValues]);
     else booksSheet.appendRow(bookValues);
@@ -158,6 +165,7 @@ function readBooks_() {
       coverImage: driveMediaUrl_(String(row[4] || ''), 'cover'),
       isHidden: row[5] === true || String(row[5]).toLowerCase() === 'true',
       bookType: String(row[6] || 'Other'),
+      isComingSoon: row[7] === true || String(row[7]).toLowerCase() === 'true',
       pages: pageRows.filter(function(page) { return String(page[0]) === id; })
         .sort(function(a, b) { return Number(a[2]) - Number(b[2]); })
         .map(function(page) { return { id: String(page[1]), pageNumber: Number(page[2]), originalText: String(page[3] || ''), khmerText: String(page[4] || ''), audioUrl: driveMediaUrl_(String(page[5] || ''), 'audio'), audioFileName: String(page[6] || '') }; })
