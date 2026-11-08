@@ -64,6 +64,32 @@ async function ensureSchema() {
     data JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS reader_users (
+    username TEXT PRIMARY KEY,
+    phone TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS reading_progress (
+    username TEXT NOT NULL REFERENCES reader_users(username) ON DELETE CASCADE,
+    book_id TEXT NOT NULL,
+    page_index INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (username, book_id)
+  )`);
+}
+
+function normalizeReaderCredentials(body) {
+  const username = String(body?.username || "").trim();
+  const phone = String(body?.phone || "").replace(/[^+0-9]/g, "");
+  if (!/^[\w .-]{2,40}$/.test(username) || !/^\+?[0-9]{7,15}$/.test(phone)) {
+    throw new Error("Enter a username and valid phone number.");
+  }
+  return { username, phone };
+}
+function normalizeUsername(value) {
+  const username = String(value || "").trim();
+  if (!/^[\w .-]{2,40}$/.test(username)) throw new Error("Invalid username.");
+  return username;
 }
 
 async function googleStorageRequest(action, book, fileId) {
@@ -89,22 +115,38 @@ async function googleUserRequest(action, data) {
 
 app.post("/api/users/:action", async (req, res, next) => {
   try {
-    if (!googleAppsScriptUrl) return res.status(503).json({ error: "Set up Google Drive storage to enable accounts." });
     const action = req.params.action;
     if (!["register", "login"].includes(action)) return res.status(404).end();
-    res.json(await googleUserRequest(action, req.body || {}));
+    if (googleAppsScriptUrl) return res.json(await googleUserRequest(action, req.body || {}));
+    const { username, phone } = normalizeReaderCredentials(req.body);
+    if (action === "register") {
+      await pool.query("INSERT INTO reader_users (username, phone) VALUES ($1, $2)", [username, phone]);
+    } else {
+      const { rows } = await pool.query("SELECT username FROM reader_users WHERE lower(username) = lower($1) AND phone = $2", [username, phone]);
+      if (!rows.length) return res.status(401).json({ error: "Username or phone number is incorrect." });
+      return res.json({ ok: true, user: { username: rows[0].username } });
+    }
+    res.json({ ok: true, user: { username } });
   } catch (error) { next(error); }
 });
 app.post("/api/progress", async (req, res, next) => {
   try {
-    if (!googleAppsScriptUrl) return res.status(503).json({ error: "Google Drive storage is required for synced reading progress." });
-    res.json(await googleUserRequest("progress", req.body || {}));
+    if (googleAppsScriptUrl) return res.json(await googleUserRequest("progress", req.body || {}));
+    const username = normalizeUsername(req.body?.username);
+    const bookId = String(req.body?.bookId || "").trim();
+    const pageIndex = Math.max(0, Math.floor(Number(req.body?.pageIndex) || 0));
+    if (!bookId) return res.status(400).json({ error: "Invalid reading progress." });
+    const result = await pool.query("UPDATE reading_progress SET page_index = $3, updated_at = NOW() WHERE username = $1 AND book_id = $2 RETURNING username", [username, bookId, pageIndex]);
+    if (!result.rowCount) await pool.query("INSERT INTO reading_progress (username, book_id, page_index) SELECT username, $2, $3 FROM reader_users WHERE lower(username) = lower($1) ON CONFLICT (username, book_id) DO UPDATE SET page_index = EXCLUDED.page_index, updated_at = NOW()", [username, bookId, pageIndex]);
+    res.json({ ok: true });
   } catch (error) { next(error); }
 });
 app.get("/api/progress/:username", async (req, res, next) => {
   try {
-    if (!googleAppsScriptUrl) return res.status(503).json({ error: "Google Drive storage is required for synced reading progress." });
-    res.json(await googleUserRequest("getProgress", { username: req.params.username }));
+    if (googleAppsScriptUrl) return res.json(await googleUserRequest("getProgress", { username: req.params.username }));
+    const username = normalizeUsername(req.params.username);
+    const { rows } = await pool.query("SELECT book_id AS \"bookId\", page_index AS \"pageIndex\", updated_at AS \"updatedAt\" FROM reading_progress WHERE lower(username) = lower($1) ORDER BY updated_at DESC", [username]);
+    res.json({ ok: true, progress: rows });
   } catch (error) { next(error); }
 });
 
