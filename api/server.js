@@ -127,7 +127,17 @@ app.post("/api/users/:action", async (req, res, next) => {
       return res.json({ ok: true, user: { username: rows[0].username } });
     }
     res.json({ ok: true, user: { username } });
-  } catch (error) { next(error); }
+  } catch (error) {
+    // Account validation and credential failures are expected client errors;
+    // don't turn them into the generic 500 shown by the global handler.
+    if (/username or phone number is incorrect/i.test(error.message)) {
+      return res.status(401).json({ error: error.message });
+    }
+    if (/enter a username|already registered/i.test(error.message)) {
+      return res.status(400).json({ error: error.message });
+    }
+    next(error);
+  }
 });
 app.post("/api/progress", async (req, res, next) => {
   try {
