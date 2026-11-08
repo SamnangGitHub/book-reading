@@ -813,7 +813,7 @@ export default function App() {
     document.documentElement.style.background = theme === "dark" ? "#09090b" : theme === "reading" ? "#fbf0d9" : "#f8fafc";
   }, [theme]);
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
-  const getBookTypes = (book) => String(book.bookType || "Other").split(/[\/;,]+/).map((type) => type.trim()).filter(Boolean);
+  const getBookTypes = (book) => [...new Set(String(book.bookType || "Other").split(/[\/;,]+/).map((type) => type.trim()).filter(Boolean))];
   const bookTypes = [...new Set(books.flatMap(getBookTypes))].sort((a, b) => a.localeCompare(b));
   const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
     [book.title, book.titleKhmer, book.author]
@@ -888,21 +888,21 @@ export default function App() {
                 <Sparkles className="absolute right-3 bottom-2 w-20 h-20 text-white/10 pointer-events-none" />
               </div>
 
-              <label className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-zinc-900 border border-[#e9e4df] dark:border-zinc-800 text-slate-400 shadow-sm focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100">
-                <Search className="w-4 h-4 shrink-0 text-[#a5a0a0]" />
+              <label className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-white dark:bg-zinc-900 border border-[#e9e4df] dark:border-zinc-800 text-slate-400 shadow-sm focus-within:border-violet-300 focus-within:ring-1 focus-within:ring-violet-100">
+                <Search className="w-2 h-2 shrink-0 text-[#a5a0a0]" />
                 <input
                   type="search"
                   value={bookSearch}
                   onChange={(e) => setBookSearch(e.target.value)}
                   placeholder="Search books by title, author or Khmer..."
                   aria-label="Search books by title, author or Khmer"
-                  className="w-full bg-transparent text-xs text-slate-800 dark:text-zinc-100 outline-none placeholder:text-[#aaa4a1]"
+                  className="w-full bg-transparent text-[7px] text-slate-800 dark:text-zinc-100 outline-none placeholder:text-[#aaa4a1]"
                 />
               </label>
 
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio Ready"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded-xl border px-3 py-1.5 text-[3px] font-semibold transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap gap-1">
+                  {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio Ready"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[3px] font-semibold transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
                 </div>
                 <div className="flex min-w-0 items-center gap-2">
                   {bookTypes.length > 0 && <label className="flex min-w-0 items-center gap-2 text-[10px] font-medium text-slate-500">
