@@ -80,6 +80,34 @@ async function googleStorageRequest(action, book, fileId) {
   return result;
 }
 
+async function googleUserRequest(action, data) {
+  const response = await fetch(googleAppsScriptUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...data }), signal: AbortSignal.timeout(30000) });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.ok) throw new Error(result?.error || "Account storage request failed.");
+  return result;
+}
+
+app.post("/api/users/:action", async (req, res, next) => {
+  try {
+    if (!googleAppsScriptUrl) return res.status(503).json({ error: "Set up Google Drive storage to enable accounts." });
+    const action = req.params.action;
+    if (!["register", "login"].includes(action)) return res.status(404).end();
+    res.json(await googleUserRequest(action, req.body || {}));
+  } catch (error) { next(error); }
+});
+app.post("/api/progress", async (req, res, next) => {
+  try {
+    if (!googleAppsScriptUrl) return res.status(503).json({ error: "Google Drive storage is required for synced reading progress." });
+    res.json(await googleUserRequest("progress", req.body || {}));
+  } catch (error) { next(error); }
+});
+app.get("/api/progress/:username", async (req, res, next) => {
+  try {
+    if (!googleAppsScriptUrl) return res.status(503).json({ error: "Google Drive storage is required for synced reading progress." });
+    res.json(await googleUserRequest("getProgress", { username: req.params.username }));
+  } catch (error) { next(error); }
+});
+
 async function listBooks() {
   if (googleAppsScriptUrl) {
     const books = (await googleStorageRequest("list")).books;
