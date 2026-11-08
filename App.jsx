@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi } from "./src/bookApi.js";
+import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi, userAccount, saveReadingProgress, loadReadingProgress } from "./src/bookApi.js";
 import {
   BookOpen,
   Plus,
@@ -50,11 +50,46 @@ export default function App() {
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
   const [showHiddenBooks, setShowHiddenBooks] = useState(false);
+  const [readerUser, setReaderUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("khmer-reader-user") || "null"); } catch { return null; }
+  });
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [accountMode, setAccountMode] = useState("login");
+  const [accountUsername, setAccountUsername] = useState("");
+  const [accountPhone, setAccountPhone] = useState("");
+  const [accountMessage, setAccountMessage] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
 
   // Editing state: null when creating new, or book ID string when editing existing
   const [editingBookId, setEditingBookId] = useState(null);
   const [expandedPageId, setExpandedPageId] = useState(null);
   const [adminToken, setAdminToken] = useState(() => sessionStorage.getItem("khmer-reader-admin-token") || "");
+
+  const submitAccount = async (event) => {
+    event.preventDefault();
+    if (!apiConfigured) { setAccountMessage("Accounts require the app API. Configure VITE_API_URL first."); return; }
+    setAccountBusy(true);
+    setAccountMessage("");
+    try {
+      const result = await userAccount(accountMode === "register" ? "register" : "login", { username: accountUsername, phone: accountPhone });
+      const user = result.user;
+      localStorage.setItem("khmer-reader-user", JSON.stringify(user));
+      setReaderUser(user);
+      setShowAccountForm(false);
+      setAccountPhone("");
+      setAccountMessage(`Signed in as ${user.username}.`);
+      const saved = await loadReadingProgress(user.username);
+      const latest = (saved.progress || []).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+      if (latest) setAccountMessage(`Welcome back, ${user.username}. Your reading history is saved.`);
+    } catch (error) { setAccountMessage(error.message); }
+    finally { setAccountBusy(false); }
+  };
+
+  const signOutReader = () => {
+    localStorage.removeItem("khmer-reader-user");
+    setReaderUser(null);
+    setAccountMessage("You are browsing as a guest. Reading history stays on this device until you sign in.");
+  };
 
   const requireAdmin = async (action) => {
     if (!apiConfigured) {
@@ -116,6 +151,14 @@ export default function App() {
   // Active Book Data
   const currentBook = books.find((b) => b.id === activeBookId) || books[0];
   const currentPage = currentBook?.pages[currentPageIndex] || null;
+
+  useEffect(() => {
+    if (!readerUser || !currentBook?.id || currentView !== "reader") return;
+    const timer = window.setTimeout(() => {
+      saveReadingProgress(readerUser.username, currentBook.id, currentPageIndex).catch((error) => setAccountMessage(`Could not save reading history: ${error.message}`));
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [readerUser, currentBook?.id, currentPageIndex, currentView]);
 
   // New Book Creator Form State
   const [newBook, setNewBook] = useState({
@@ -739,6 +782,10 @@ export default function App() {
                 </div>
               </div>
 
+              <button onClick={() => { setAccountMode("login"); setAccountMessage(""); setShowAccountForm(true); }} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded-lg hover:bg-indigo-50 dark:hover:bg-zinc-800">
+                {readerUser ? readerUser.username : "Guest · Sign in"}
+              </button>
+
               <button
                 onClick={async () => { if (await requireAdmin("add books")) openCreateNewBook(); }}
                 className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all"
@@ -882,6 +929,24 @@ export default function App() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {showAccountForm && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-5" onClick={(event) => { if (event.target === event.currentTarget) setShowAccountForm(false); }}>
+            <form onSubmit={submitAccount} className={`w-full max-w-sm rounded-2xl p-5 shadow-xl ${currentTheme.card}`}>
+              <h2 className="text-lg font-bold mb-1">{accountMode === "register" ? "Create account" : "Sign in"}</h2>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mb-4">Continue as a guest, or use your username and phone number to save reading history across devices.</p>
+              <label className="block text-xs font-semibold mb-1">Username</label>
+              <input required minLength={2} maxLength={40} value={accountUsername} onChange={(e) => setAccountUsername(e.target.value)} className="w-full mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800" />
+              <label className="block text-xs font-semibold mb-1">Phone number</label>
+              <input required type="tel" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} placeholder="+855..." className="w-full mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800" />
+              {accountMessage && <p role="status" className="text-xs mb-3 text-indigo-600 dark:text-indigo-400">{accountMessage}</p>}
+              <button disabled={accountBusy} className="w-full py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-60">{accountBusy ? "Please wait…" : accountMode === "register" ? "Register" : "Sign in"}</button>
+              <button type="button" onClick={() => { setAccountMode(accountMode === "register" ? "login" : "register"); setAccountMessage(""); }} className="w-full py-2 text-xs text-indigo-600 dark:text-indigo-400">{accountMode === "register" ? "Already registered? Sign in" : "New here? Register"}</button>
+              {readerUser && <button type="button" onClick={signOutReader} className="w-full py-2 text-xs text-slate-500">Sign out</button>}
+              <button type="button" onClick={() => setShowAccountForm(false)} className="w-full py-1 text-xs text-slate-400">Continue as guest</button>
+            </form>
           </div>
         )}
 
