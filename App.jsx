@@ -43,6 +43,10 @@ export default function App() {
   const [activeBookId, setActiveBookId] = useState("");
   const [isLoadingBooks, setIsLoadingBooks] = useState(apiConfigured);
   const [bookSearch, setBookSearch] = useState("");
+  const [libraryFilter, setLibraryFilter] = useState("all");
+  const [readingProgress, setReadingProgress] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("khmer-reader-progress") || "{}"); } catch { return {}; }
+  });
   const [storageMessage, setStorageMessage] = useState("");
   const [isSavingBook, setIsSavingBook] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
@@ -79,6 +83,9 @@ export default function App() {
       setAccountPhone("");
       setAccountMessage(`Signed in as ${user.username}.`);
       const saved = await loadReadingProgress(user.username);
+      const progressMap = Object.fromEntries((saved.progress || []).map((item) => [item.bookId, Number(item.pageIndex) || 0]));
+      setReadingProgress(progressMap);
+      localStorage.setItem("khmer-reader-progress", JSON.stringify(progressMap));
       const latest = (saved.progress || []).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
       if (latest) setAccountMessage(`Welcome back, ${user.username}. Your reading history is saved.`);
     } catch (error) { setAccountMessage(error.message); }
@@ -90,6 +97,15 @@ export default function App() {
     setReaderUser(null);
     setAccountMessage("You are browsing as a guest. Reading history stays on this device until you sign in.");
   };
+
+  useEffect(() => {
+    if (!readerUser?.username || !apiConfigured) return;
+    loadReadingProgress(readerUser.username).then(({ progress = [] }) => {
+      const map = Object.fromEntries(progress.map((item) => [item.bookId, Number(item.pageIndex) || 0]));
+      setReadingProgress(map);
+      localStorage.setItem("khmer-reader-progress", JSON.stringify(map));
+    }).catch((error) => setAccountMessage(`Could not load reading history: ${error.message}`));
+  }, [readerUser?.username]);
 
   const requireAdmin = async (action) => {
     if (!apiConfigured) {
@@ -155,6 +171,11 @@ export default function App() {
   useEffect(() => {
     if (!readerUser || !currentBook?.id || currentView !== "reader") return;
     const timer = window.setTimeout(() => {
+      setReadingProgress((previous) => {
+        const next = { ...previous, [currentBook.id]: currentPageIndex };
+        localStorage.setItem("khmer-reader-progress", JSON.stringify(next));
+        return next;
+      });
       saveReadingProgress(readerUser.username, currentBook.id, currentPageIndex).catch((error) => setAccountMessage(`Could not save reading history: ${error.message}`));
     }, 500);
     return () => window.clearTimeout(timer);
@@ -282,8 +303,9 @@ export default function App() {
 
   // Switch to Reader View
   const openReader = (bookId) => {
+    const book = books.find((item) => item.id === bookId);
     setActiveBookId(bookId);
-    setCurrentPageIndex(0);
+    setCurrentPageIndex(Math.min(readingProgress[bookId] || 0, Math.max(0, (book?.pages.length || 1) - 1)));
     setCurrentView("reader");
   };
 
@@ -753,7 +775,9 @@ export default function App() {
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
   const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
     [book.title, book.titleKhmer, book.author]
-      .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch))
+      .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch)) &&
+    (libraryFilter !== "reading" || readingProgress[book.id] > 0) &&
+    (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl))
   );
 
   return (
@@ -761,30 +785,26 @@ export default function App() {
       className={`min-h-screen ${currentTheme.bg} ${currentTheme.text} flex justify-center font-sans transition-colors duration-200 antialiased`}
     >
       {/* Mobile Wrapper with fixed max-width for phone proportions */}
-      <div className="w-full max-w-md min-h-screen flex flex-col relative shadow-2xl border-x border-black/5">
+      <div className="w-full max-w-5xl min-h-screen flex flex-col relative bg-slate-50 shadow-2xl border-x border-black/5">
         
         {/* ========================================================= */}
         {/* VIEW 1: BOOK LIBRARY                                      */}
         {/* ========================================================= */}
         {currentView === "library" && (
-          <div className="flex-1 flex flex-col pb-20">
+          <div className="flex-1 flex flex-col pb-10">
             {/* Header */}
-            <header className="sticky top-0 z-20 backdrop-blur-md bg-white/80 dark:bg-zinc-900/80 border-b border-slate-200 dark:border-zinc-800 px-5 py-4 flex items-center justify-between">
+            <header className="sticky top-0 z-20 backdrop-blur-md bg-white/95 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-                  <Languages className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                  <Languages className="w-4 h-4" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold leading-tight">Khmer Reader</h1>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
+                  <h1 className="text-sm font-extrabold leading-tight">Khmer Reader <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">PRO</span></h1>
+                  <p className="text-[10px] text-slate-500 font-medium">
                     បណ្ណាល័យសៀវភៅពីរភាសា
                   </p>
                 </div>
               </div>
-
-              <button onClick={() => { setAccountMode("login"); setAccountMessage(""); setShowAccountForm(true); }} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded-lg hover:bg-indigo-50 dark:hover:bg-zinc-800">
-                {readerUser ? readerUser.username : "Guest · Sign in"}
-              </button>
 
               <button
                 onClick={async () => { if (await requireAdmin("add books")) openCreateNewBook(); }}
@@ -799,15 +819,16 @@ export default function App() {
             <div className="p-4 space-y-4 flex-1">
               {storageMessage && <p className="text-[11px] text-rose-600 dark:text-rose-400" role="status">{storageMessage}</p>}
               {/* Banner */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg relative overflow-hidden">
+              <div className="p-5 sm:p-7 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 text-white shadow-lg relative overflow-hidden">
                 <div className="relative z-10">
-                  <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[11px] font-medium backdrop-blur-sm">
+                  <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-semibold backdrop-blur-sm">
                     Dual Language & Voice
                   </span>
                   <h2 className="text-lg font-bold mt-2">អាន និងស្តាប់ជាភាសាខ្មែរ</h2>
-                  <p className="text-xs text-indigo-100 mt-1 max-w-[220px]">
+                  <p className="text-xs text-indigo-100 mt-1 max-w-lg">
                     Read side-by-side or in Khmer with native page audio narration.
                   </p>
+                  <div className="flex items-center gap-3 mt-4 text-[10px] text-indigo-100"><button onClick={() => books[0] && openReader(books[0].id)} className="rounded-lg bg-white px-3 py-1.5 text-indigo-700 font-semibold">▶ Try Demo Reader</button><span>219+ Voice Models</span></div>
                 </div>
                 <Sparkles className="absolute right-3 bottom-2 w-20 h-20 text-white/10 pointer-events-none" />
               </div>
@@ -818,15 +839,19 @@ export default function App() {
                   type="search"
                   value={bookSearch}
                   onChange={(e) => setBookSearch(e.target.value)}
-                  placeholder="Search books by title or author"
-                  aria-label="Search books by title or author"
+                  placeholder="Search books by title, author or Khmer..."
+                  aria-label="Search books by title, author or Khmer"
                   className="w-full bg-transparent text-sm text-slate-800 dark:text-zinc-100 outline-none placeholder:text-slate-400"
                 />
               </label>
 
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {[['all', `All Books (${books.filter((b) => !b.isHidden).length})`], ['reading', 'Reading Now'], ['audio', 'Audio Ready'], ['favorites', 'Favorites']].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 px-3 py-1.5 rounded-lg border text-[10px] font-semibold ${libraryFilter === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}>{label}</button>)}
+              </div>
+
               {/* Book List Header */}
               <div className="flex items-center justify-between pt-2">
-                <h2 className="text-sm font-semibold tracking-wide uppercase text-slate-500 dark:text-zinc-400">
+                <h2 className="text-[11px] font-bold tracking-wide uppercase text-slate-500 dark:text-zinc-400">
                     {adminMode && showHiddenBooks ? "Hidden Books" : "Available Books"} ({filteredBooks.length})
                 </h2>
                 {adminMode && (
@@ -837,7 +862,7 @@ export default function App() {
               </div>
 
               {/* Grid of Books */}
-              <div className="grid grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {isLoadingBooks ? (
                   Array.from({ length: 4 }, (_, index) => (
                     <div key={index} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -848,12 +873,12 @@ export default function App() {
                 ) : filteredBooks.length ? filteredBooks.map((b) => (
                   <div
                     key={b.id}
-                    className="group bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col relative"
+                    className="group bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col relative"
                   >
                     {/* Book Cover */}
                     <div
                       onClick={() => openReader(b.id)}
-                      className="aspect-[3/4] w-full relative bg-slate-100 dark:bg-zinc-800 overflow-hidden cursor-pointer"
+                      className="aspect-[3/4] w-full relative bg-slate-100 overflow-hidden cursor-pointer"
                     >
                       <img
                         src={b.coverImage}
@@ -864,27 +889,35 @@ export default function App() {
                             "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
                         }}
                       />
+                      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />
+                      {b.pages.some((page) => page.audioUrl) && <span className="absolute top-2 left-2 bg-indigo-600/90 px-2 py-0.5 rounded-md text-[9px] font-bold text-white">Dual Sync</span>}
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
                       </div>
+                      <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-6 h-6 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3 h-3 fill-current" /></button>
                     </div>
 
                     {/* Book Details */}
-                    <div className="p-3 flex flex-col flex-1 justify-between">
+                    <div className="p-2.5 flex flex-col flex-1 justify-between">
                       <div onClick={() => openReader(b.id)} className="cursor-pointer">
-                        <h3 className="text-sm font-bold line-clamp-1 group-hover:text-indigo-600 transition">
+                        <h3 className="text-[11px] font-bold line-clamp-1 group-hover:text-indigo-600 transition">
                           {b.title}
                         </h3>
                         {b.titleKhmer && (
-                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium line-clamp-1 mt-0.5">
+                          <p className="text-[10px] text-indigo-600 font-medium line-clamp-1 mt-0.5">
                             {b.titleKhmer}
                           </p>
                         )}
-                        <p className="text-[11px] text-slate-400 mt-1">
+                        <p className="text-[10px] text-slate-500 mt-1">
                           {b.author || "Unknown Author"}
                         </p>
                       </div>
+
+                      {!adminMode && <div className="mt-2 border-t border-slate-100 pt-2">
+                        <div className="flex justify-between text-[9px] text-slate-500 mb-1"><span>Progress</span><span className="font-bold text-slate-700">{Math.round((Math.min(readingProgress[b.id] || 0, Math.max(0, b.pages.length - 1)) / Math.max(1, b.pages.length)) * 100)}%</span></div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${Math.round((Math.min(readingProgress[b.id] || 0, Math.max(0, b.pages.length - 1)) / Math.max(1, b.pages.length)) * 100)}%` }} /></div>
+                      </div>}
 
                       {/* Book actions are only shown after admin authentication. */}
                       {adminMode && <div className="mt-3 pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-medium">
