@@ -204,6 +204,7 @@ export default function App() {
     author: "",
     bookType: "",
     customBookType: "",
+    isComingSoon: false,
     coverImage: "",
     pages: [
       {
@@ -340,7 +341,8 @@ export default function App() {
       titleKhmer: book.titleKhmer || "",
       author: book.author || "",
       bookType: book.bookType || "Other",
-      customBookType: book.bookType && (!["Leadership", "Personal Development", "Business", "Finance", "Education", "History", "Fiction"].includes(book.bookType)) ? book.bookType : "",
+      customBookType: book.bookType || "",
+      isComingSoon: Boolean(book.isComingSoon),
       coverImage: book.coverImage || "",
       pages: book.pages.map((p) => ({ ...p }))
     });
@@ -360,6 +362,7 @@ export default function App() {
       author: "",
       bookType: "",
       customBookType: "",
+      isComingSoon: false,
       coverImage: "",
       pages: [
         {
@@ -600,6 +603,7 @@ export default function App() {
             titleKhmer: newBook.titleKhmer,
             author: newBook.author,
             bookType: selectedBookType,
+            isComingSoon: Boolean(newBook.isComingSoon),
             coverImage:
               newBook.coverImage ||
               "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80",
@@ -649,7 +653,7 @@ export default function App() {
     if (editingBookId) {
       setSaveStatus("Book information saved. Page edits are saved individually.");
     } else {
-      setCurrentView("reader");
+      setCurrentView(newBook.isComingSoon ? "library" : "reader");
     }
     } finally {
       setIsSavingBook(false);
@@ -809,13 +813,14 @@ export default function App() {
     document.documentElement.style.background = theme === "dark" ? "#09090b" : theme === "reading" ? "#fbf0d9" : "#f8fafc";
   }, [theme]);
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
-  const bookTypes = [...new Set([...books.map((book) => book.bookType).filter(Boolean), ...(books.some((book) => !book.bookType) ? ["Other"] : [])])].sort((a, b) => a.localeCompare(b));
+  const getBookTypes = (book) => String(book.bookType || "Other").split(/[\/;,]+/).map((type) => type.trim()).filter(Boolean);
+  const bookTypes = [...new Set(books.flatMap(getBookTypes))].sort((a, b) => a.localeCompare(b));
   const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
     [book.title, book.titleKhmer, book.author]
       .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch)) &&
     (libraryFilter !== "reading" || readingProgress[book.id] > 0) &&
     (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl)) &&
-    (bookTypeFilter === "all" || (book.bookType || "Other") === bookTypeFilter) &&
+    (bookTypeFilter === "all" || getBookTypes(book).includes(bookTypeFilter)) &&
     (libraryFilter !== "favorites" || readingProgress[book.id] > 0)
   );
 
@@ -942,8 +947,8 @@ export default function App() {
                   >
                     {/* Book Cover */}
                     <div
-                      onClick={() => openReader(b.id)}
-                      className="aspect-[3/4] w-full relative bg-slate-100 overflow-hidden cursor-pointer"
+                      onClick={() => { if (!b.isComingSoon) openReader(b.id); }}
+                      className={`aspect-[3/4] w-full relative bg-slate-100 overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
                     >
                       <img
                         src={b.coverImage}
@@ -955,17 +960,18 @@ export default function App() {
                         }}
                       />
                       <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />
+                      {b.isComingSoon && <span className="absolute left-2 bottom-2 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-extrabold text-amber-950 shadow">Coming soon</span>}
                       {b.pages.some((page) => page.audioUrl) && <span className="absolute top-2 left-2 bg-indigo-600/90 px-2 py-0.5 rounded-md text-[9px] font-bold text-white">Dual Sync</span>}
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
                       </div>
-                      <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-6 h-6 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3 h-3 fill-current" /></button>
+                      {!b.isComingSoon && <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-6 h-6 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3 h-3 fill-current" /></button>}
                     </div>
 
                     {/* Book Details */}
                     <div className="p-2.5 flex flex-col flex-1 justify-between">
-                      <div onClick={() => openReader(b.id)} className="cursor-pointer">
+                      <div onClick={() => { if (!b.isComingSoon) openReader(b.id); }} className={b.isComingSoon ? "" : "cursor-pointer"}>
                         <h3 className="text-[11px] font-bold line-clamp-1 group-hover:text-indigo-600 transition">
                           {b.title}
                         </h3>
@@ -977,7 +983,7 @@ export default function App() {
                         <p className="text-[10px] text-slate-500 mt-1">
                           {b.author || "Unknown Author"}
                         </p>
-                        <span className="mt-1 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-semibold text-indigo-700">{b.bookType || "Other"}</span>
+                        <div className="mt-1 flex flex-wrap gap-1">{getBookTypes(b).map((type) => <span key={type} className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-semibold text-indigo-700">{type}</span>)}</div>
                       </div>
 
                       {!adminMode && <div className="mt-2 border-t border-slate-100 pt-2">
@@ -999,13 +1005,13 @@ export default function App() {
                           className="text-red-600 hover:text-red-800 p-1"
                           title="Permanently delete this book and its pages"
                         >Delete</button>}
-                        <button
+                        {!b.isComingSoon && <button
                           onClick={() => openReader(b.id)}
                           className="text-indigo-600 hover:text-indigo-700 flex items-center space-x-0.5"
                         >
                           <span>Read</span>
                           <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
+                        </button>}
 
                         <button
                           onClick={(e) => {
@@ -1532,13 +1538,11 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold mb-1 block">Book type *</label>
-                  <select required value={newBook.bookType} onChange={(e) => setNewBook((prev) => ({ ...prev, bookType: e.target.value, customBookType: e.target.value === "Other" ? prev.customBookType : "" }))} className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm outline-none focus:border-indigo-500">
-                    <option value="" disabled>Select a type</option>
-                    {["Leadership", "Personal Development", "Business", "Finance", "Education", "History", "Fiction", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}
-                  </select>
-                  {newBook.bookType === "Other" && <input required type="text" maxLength={60} value={newBook.customBookType} onChange={(e) => setNewBook((prev) => ({ ...prev, customBookType: e.target.value }))} placeholder="Enter book type" className="mt-2 w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm outline-none focus:border-indigo-500" />}
+                  <label className="text-xs font-semibold mb-1 block">Book types *</label>
+                  <input required type="text" maxLength={160} value={newBook.customBookType ?? newBook.bookType} onChange={(e) => setNewBook((prev) => ({ ...prev, bookType: e.target.value, customBookType: e.target.value }))} placeholder="Business parable / Management / Non-fiction / Self-help" className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm outline-none focus:border-indigo-500" />
+                  <p className="mt-1 text-[10px] text-slate-500">Separate multiple types with /, comma, or semicolon. Each becomes a filter and label.</p>
                 </div>
+                <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-900"><input type="checkbox" checked={Boolean(newBook.isComingSoon)} onChange={(event) => setNewBook((prev) => ({ ...prev, isComingSoon: event.target.checked }))} className="h-4 w-4 accent-amber-600" />Show this book to readers as Coming soon</label>
               </div>
 
               {/* SECTION: Page By Page Content */}
