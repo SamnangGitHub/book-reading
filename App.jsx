@@ -895,18 +895,18 @@ export default function App() {
                 />
               </label>
 
-                <div className="flex items-center justify-between gap-2">
-                <div className="flex gap-1.5 overflow-x-auto">
-                  {[['all', `All (${books.filter((b) => !b.isHidden).length})`], ['reading', 'Reading'], ['audio', 'Audio']].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 px-2.5 py-1 rounded-md border text-[10px] font-semibold ${libraryFilter === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white/80 text-slate-600 border-slate-200'}`}>{label}</button>)}
+                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                  {[['all', `All (${books.filter((b) => !b.isHidden).length})`], ['reading', 'Reading'], ['audio', 'Audio']].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 px-3 py-1.5 rounded-md border text-xs font-semibold transition-colors ${libraryFilter === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white/80 text-slate-600 border-slate-200 hover:border-indigo-300'}`}>{label}</button>)}
                 </div>
-              {bookTypes.length > 0 && <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
+              {bookTypes.length > 0 && <label className="flex min-w-0 flex-1 items-center gap-2 text-xs font-semibold text-slate-500">
                 <span>Book type</span>
-                <select value={bookTypeFilter} onChange={(event) => setBookTypeFilter(event.target.value)} aria-label="Filter books by type" className="max-w-[70%] rounded-md border border-slate-200 bg-white/90 px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400">
+                <select value={bookTypeFilter} onChange={(event) => setBookTypeFilter(event.target.value)} aria-label="Filter books by type" className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white/90 px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400">
                   <option value="all">All types</option>
                   {bookTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                 </select>
               </label>}
-                <div className="flex rounded-md border bg-white/80 p-0.5"><button aria-label="Grid view" onClick={() => setLibraryLayout("grid")} className={`rounded p-1 ${libraryLayout === "grid" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><LayoutGrid className="h-3.5 w-3.5" /></button><button aria-label="List view" onClick={() => setLibraryLayout("list")} className={`rounded p-1 ${libraryLayout === "list" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><List className="h-3.5 w-3.5" /></button></div>
+                <div className="ml-auto flex shrink-0 rounded-md border border-slate-200 bg-white/80 p-0.5"><button aria-label="Grid view" onClick={() => setLibraryLayout("grid")} className={`rounded p-1.5 ${libraryLayout === "grid" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><LayoutGrid className="h-3.5 w-3.5" /></button><button aria-label="List view" onClick={() => setLibraryLayout("list")} className={`rounded p-1.5 ${libraryLayout === "list" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><List className="h-3.5 w-3.5" /></button></div>
               </div>
 
               {/* Book List Header */}
