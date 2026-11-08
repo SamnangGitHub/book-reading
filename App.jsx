@@ -143,7 +143,7 @@ export default function App() {
   // Reader Settings & Preferences
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [displayMode, setDisplayMode] = useState("both"); // 'original' | 'both' | 'khmer'
-  const [theme, setTheme] = useState("sepia"); // 'light' | 'dark' | 'sepia'
+  const [theme, setTheme] = useState(() => localStorage.getItem("khmer-reader-theme") || "light"); // 'light' | 'dark'
   const [fontSize, setFontSize] = useState(18); // Base font size in px
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -757,16 +757,6 @@ export default function App() {
       badge: "bg-indigo-50 text-indigo-700 border-indigo-100",
       highlight: "bg-blue-50/70 text-slate-900 border-l-4 border-blue-500"
     },
-    sepia: {
-      bg: "bg-[#fbf0d9]",
-      card: "bg-[#f4e4c1]",
-      text: "text-[#433422]",
-      subtext: "text-[#795548]",
-      accent: "text-[#8d5b4c]",
-      border: "border-[#e0ceaa]",
-      badge: "bg-[#e8d5b5] text-[#5d4037] border-[#d7be95]",
-      highlight: "bg-[#ebd9b7]/80 text-[#3e2723] border-l-4 border-[#8d5b4c]"
-    },
     dark: {
       bg: "bg-zinc-950",
       card: "bg-zinc-900",
@@ -780,6 +770,10 @@ export default function App() {
   };
 
   const currentTheme = themeStyles[theme];
+  useEffect(() => {
+    localStorage.setItem("khmer-reader-theme", theme);
+    document.documentElement.style.background = theme === "dark" ? "#09090b" : "#f8fafc";
+  }, [theme]);
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
   const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
     [book.title, book.titleKhmer, book.author]
@@ -794,7 +788,7 @@ export default function App() {
       className={`min-h-screen ${currentTheme.bg} ${currentTheme.text} flex justify-center font-sans transition-colors duration-200 antialiased`}
     >
       {/* Mobile Wrapper with fixed max-width for phone proportions */}
-      <div className="w-full max-w-5xl min-h-screen flex flex-col relative bg-slate-50 shadow-2xl border-x border-black/5">
+      <div className={`w-full max-w-5xl min-h-screen flex flex-col relative ${theme === "dark" ? "bg-zinc-950" : "bg-slate-50"} shadow-2xl border-x border-black/5`}>
         
         {/* ========================================================= */}
         {/* VIEW 1: BOOK LIBRARY                                      */}
@@ -802,26 +796,30 @@ export default function App() {
         {currentView === "library" && (
           <div className="flex-1 flex flex-col pb-20">
             {/* Header */}
-            <header className="sticky top-0 z-20 backdrop-blur-md bg-white/95 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+            <header className={`sticky top-0 z-20 backdrop-blur-md px-4 sm:px-5 py-3 flex items-center justify-between border-b ${theme === "dark" ? "bg-zinc-950/95 border-zinc-800" : "bg-white/95 border-slate-200"}`}>
               <div className="flex items-center space-x-2.5">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
                   <Languages className="w-4 h-4" />
                 </div>
                 <div>
                   <h1 className="text-sm font-extrabold leading-tight">Khmer Reader <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">PRO</span></h1>
-                  <p className="text-[10px] text-slate-500 font-medium">
-                    បណ្ណាល័យសៀវភៅពីរភាសា
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-medium">
+                    {readerUser?.username ? `Signed in as ${readerUser.username}` : "Browsing as guest"}
                   </p>
                 </div>
               </div>
-
-              <button
+              <div className="flex items-center gap-2">
+                <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "night"} theme`} title={`Switch to ${theme === "dark" ? "light" : "night"} theme`} className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${theme === "dark" ? "border-zinc-700 bg-zinc-900 text-amber-300" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+                  {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+                <button
                 onClick={async () => { if (await requireAdmin("add books")) openCreateNewBook(); }}
                 className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Upload</span>
               </button>
+              </div>
             </header>
 
             {/* Content List */}
@@ -1281,7 +1279,7 @@ export default function App() {
                     <label className="text-xs font-semibold text-slate-500 uppercase">
                       ស្បែកពណ៌ (Theme)
                     </label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="grid grid-cols-2 gap-2 mt-2">
                       <button
                         onClick={() => setTheme("light")}
                         className={`py-2 px-3 rounded-xl border flex items-center justify-center space-x-1.5 text-xs font-semibold ${
@@ -1292,17 +1290,6 @@ export default function App() {
                       >
                         <Sun className="w-4 h-4" />
                         <span>Light</span>
-                      </button>
-                      <button
-                        onClick={() => setTheme("sepia")}
-                        className={`py-2 px-3 rounded-xl border flex items-center justify-center space-x-1.5 text-xs font-semibold ${
-                          theme === "sepia"
-                            ? "border-[#8d5b4c] bg-[#f4e4c1] text-[#433422] shadow-sm"
-                            : "border-[#e0ceaa] bg-[#fbf0d9] text-[#795548]"
-                        }`}
-                      >
-                        <Coffee className="w-4 h-4" />
-                        <span>Sepia</span>
                       </button>
                       <button
                         onClick={() => setTheme("dark")}
@@ -1697,19 +1684,19 @@ export default function App() {
           </div>
         )}
 
-        <nav aria-label="Mobile navigation" className="fixed bottom-0 left-1/2 z-40 w-full max-w-5xl -translate-x-1/2 border-t border-slate-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md">
-          <div className="grid h-[58px] grid-cols-4">
-            <button onClick={() => { setCurrentView("library"); setLibraryFilter("all"); }} className={`flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium ${currentView === "library" && libraryFilter === "all" ? "text-indigo-600" : "text-slate-400"}`} aria-current={currentView === "library" && libraryFilter === "all" ? "page" : undefined}>
-              <BookOpen className="h-4 w-4" /><span>Library</span>
+        <nav aria-label="Mobile navigation" className={`fixed bottom-0 left-1/2 z-40 w-full max-w-5xl -translate-x-1/2 border-t px-3 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl ${theme === "dark" ? "border-zinc-800 bg-zinc-950/95" : "border-slate-200 bg-white/95"}`}>
+          <div className="grid h-[64px] grid-cols-4 gap-1">
+            <button onClick={() => { setCurrentView("library"); setLibraryFilter("all"); }} className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${currentView === "library" && libraryFilter === "all" ? "text-indigo-600" : "text-slate-400 dark:text-zinc-500"}`} aria-current={currentView === "library" && libraryFilter === "all" ? "page" : undefined}>
+              <BookOpen className="h-[18px] w-[18px]" /><span>Library</span>
             </button>
-            <button onClick={() => { setCurrentView("library"); setLibraryFilter("audio"); }} className={`flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium ${currentView === "library" && libraryFilter === "audio" ? "text-indigo-600" : "text-slate-400"}`} aria-current={currentView === "library" && libraryFilter === "audio" ? "page" : undefined}>
-              <Volume2 className="h-4 w-4" /><span>Audio</span>
+            <button onClick={() => { setCurrentView("library"); setLibraryFilter("audio"); }} className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${currentView === "library" && libraryFilter === "audio" ? "text-indigo-600" : "text-slate-400 dark:text-zinc-500"}`} aria-current={currentView === "library" && libraryFilter === "audio" ? "page" : undefined}>
+              <Volume2 className="h-[18px] w-[18px]" /><span>Audio</span>
             </button>
-            <button onClick={() => { setCurrentView("library"); setLibraryFilter("favorites"); }} className={`flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium ${currentView === "library" && libraryFilter === "favorites" ? "text-indigo-600" : "text-slate-400"}`} aria-current={currentView === "library" && libraryFilter === "favorites" ? "page" : undefined}>
-              <Bookmark className="h-4 w-4 fill-current" /><span>Saved</span>
+            <button onClick={() => { setCurrentView("library"); setLibraryFilter("favorites"); }} className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${currentView === "library" && libraryFilter === "favorites" ? "text-indigo-600" : "text-slate-400 dark:text-zinc-500"}`} aria-current={currentView === "library" && libraryFilter === "favorites" ? "page" : undefined}>
+              <Bookmark className="h-[18px] w-[18px]" /><span>Saved</span>
             </button>
-            <button onClick={() => currentView === "reader" ? setShowSettingsModal(true) : (setAccountMode("login"), setAccountMessage(""), setShowAccountForm(true))} className="flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium text-slate-400">
-              <Settings className="h-4 w-4" /><span>{readerUser ? "Account" : "Sign in"}</span>
+            <button onClick={() => currentView === "reader" ? setShowSettingsModal(true) : (setAccountMode("login"), setAccountMessage(""), setShowAccountForm(true))} className="flex flex-col items-center justify-center gap-1 text-[10px] font-semibold text-slate-400 dark:text-zinc-500">
+              <Settings className="h-[18px] w-[18px]" /><span>{readerUser ? "Account" : "Guest"}</span>
             </button>
           </div>
         </nav>
