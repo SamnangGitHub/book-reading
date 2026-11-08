@@ -1005,7 +1005,7 @@ export default function App() {
                       />
                       <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />
                       {b.isComingSoon && <span className="absolute left-2 bottom-2 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-extrabold text-amber-950 shadow">Coming soon</span>}
-                      <span className="absolute top-2 left-2 bg-indigo-950/85 px-2 py-0.5 rounded-md text-[9px] font-bold text-white">{b.pages.filter((page) => page.audioUrl).length ? `🎧 Audio · ${b.pages.filter((page) => page.audioUrl).length}/${b.pages.length} pages` : "📖 Text reading"}</span>
+                      <span className="absolute top-2 left-2 bg-indigo-950/85 px-2 py-0.5 rounded-md text-[9px] font-bold text-white">{b.pages.filter((page) => page.audioUrl).length ? `🎧` : "📖"}</span>
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
