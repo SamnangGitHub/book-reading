@@ -48,6 +48,7 @@ export default function App() {
   const [isLoadingBooks, setIsLoadingBooks] = useState(apiConfigured);
   const [bookSearch, setBookSearch] = useState("");
   const [libraryFilter, setLibraryFilter] = useState("all");
+  const [bookTypeFilter, setBookTypeFilter] = useState("all");
   const [libraryLayout, setLibraryLayout] = useState("grid");
   const [showMainMenu, setShowMainMenu] = useState(false);
   const [pageJump, setPageJump] = useState("1");
@@ -201,6 +202,8 @@ export default function App() {
     title: "",
     titleKhmer: "",
     author: "",
+    bookType: "",
+    customBookType: "",
     coverImage: "",
     pages: [
       {
@@ -336,6 +339,8 @@ export default function App() {
       title: book.title || "",
       titleKhmer: book.titleKhmer || "",
       author: book.author || "",
+      bookType: book.bookType || "Other",
+      customBookType: book.bookType && (!["Leadership", "Personal Development", "Business", "Finance", "Education", "History", "Fiction"].includes(book.bookType)) ? book.bookType : "",
       coverImage: book.coverImage || "",
       pages: book.pages.map((p) => ({ ...p }))
     });
@@ -353,6 +358,8 @@ export default function App() {
       title: "",
       titleKhmer: "",
       author: "",
+      bookType: "",
+      customBookType: "",
       coverImage: "",
       pages: [
         {
@@ -571,6 +578,11 @@ export default function App() {
     if (e) e.preventDefault();
     if (isSavingBook) return;
     if (!(await requireAdmin("save books")) || !newBook.title.trim()) return;
+    const selectedBookType = newBook.bookType === "Other" ? newBook.customBookType.trim() : newBook.bookType;
+    if (!selectedBookType) {
+      setSaveStatus("Choose a book type. Enter a type if you select Other.");
+      return;
+    }
 
     setIsSavingBook(true);
     setSaveStatus("Preparing book update…");
@@ -587,6 +599,7 @@ export default function App() {
             title: newBook.title,
             titleKhmer: newBook.titleKhmer,
             author: newBook.author,
+            bookType: selectedBookType,
             coverImage:
               newBook.coverImage ||
               "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80",
@@ -607,6 +620,7 @@ export default function App() {
       // Create new book
       const createdBook = {
         ...newBook,
+        bookType: selectedBookType,
         id: `book-${Date.now()}`,
         coverImage:
           newBook.coverImage ||
@@ -658,6 +672,7 @@ export default function App() {
       title: newBook.title,
       titleKhmer: newBook.titleKhmer,
       author: newBook.author,
+      bookType: newBook.bookType === "Other" ? newBook.customBookType.trim() : newBook.bookType,
       coverImage: newBook.coverImage || savedBook.coverImage,
       pages: savedBook.pages.some((page) => page.id === pageToSave.id)
         ? savedBook.pages.map((page) =>
@@ -794,11 +809,13 @@ export default function App() {
     document.documentElement.style.background = theme === "dark" ? "#09090b" : theme === "reading" ? "#fbf0d9" : "#f8fafc";
   }, [theme]);
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
+  const bookTypes = [...new Set([...books.map((book) => book.bookType).filter(Boolean), ...(books.some((book) => !book.bookType) ? ["Other"] : [])])].sort((a, b) => a.localeCompare(b));
   const filteredBooks = books.filter((book) => (adminMode ? Boolean(book.isHidden) === showHiddenBooks : !book.isHidden) &&
     [book.title, book.titleKhmer, book.author]
       .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch)) &&
     (libraryFilter !== "reading" || readingProgress[book.id] > 0) &&
     (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl)) &&
+    (bookTypeFilter === "all" || (book.bookType || "Other") === bookTypeFilter) &&
     (libraryFilter !== "favorites" || readingProgress[book.id] > 0)
   );
 
@@ -862,7 +879,6 @@ export default function App() {
                   <p className="text-xs text-indigo-100 mt-1 max-w-lg">
                     Read side-by-side or in Khmer with native page audio narration.
                   </p>
-                  <div className="mt-4 text-[10px] text-indigo-100">219+ Voice Models</div>
                 </div>
                 <Sparkles className="absolute right-3 bottom-2 w-20 h-20 text-white/10 pointer-events-none" />
               </div>
@@ -879,10 +895,17 @@ export default function App() {
                 />
               </label>
 
-              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                 <div className="flex gap-1.5 overflow-x-auto">
                   {[['all', `All (${books.filter((b) => !b.isHidden).length})`], ['reading', 'Reading'], ['audio', 'Audio']].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 px-2.5 py-1 rounded-md border text-[10px] font-semibold ${libraryFilter === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white/80 text-slate-600 border-slate-200'}`}>{label}</button>)}
                 </div>
+              {bookTypes.length > 0 && <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
+                <span>Book type</span>
+                <select value={bookTypeFilter} onChange={(event) => setBookTypeFilter(event.target.value)} aria-label="Filter books by type" className="max-w-[70%] rounded-md border border-slate-200 bg-white/90 px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-400">
+                  <option value="all">All types</option>
+                  {bookTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </label>}
                 <div className="flex rounded-md border bg-white/80 p-0.5"><button aria-label="Grid view" onClick={() => setLibraryLayout("grid")} className={`rounded p-1 ${libraryLayout === "grid" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><LayoutGrid className="h-3.5 w-3.5" /></button><button aria-label="List view" onClick={() => setLibraryLayout("list")} className={`rounded p-1 ${libraryLayout === "list" ? "bg-indigo-600 text-white" : "text-slate-500"}`}><List className="h-3.5 w-3.5" /></button></div>
               </div>
 
@@ -949,6 +972,7 @@ export default function App() {
                         <p className="text-[10px] text-slate-500 mt-1">
                           {b.author || "Unknown Author"}
                         </p>
+                        <span className="mt-1 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-semibold text-indigo-700">{b.bookType || "Other"}</span>
                       </div>
 
                       {!adminMode && <div className="mt-2 border-t border-slate-100 pt-2">
@@ -1501,6 +1525,14 @@ export default function App() {
                     }
                     className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm outline-none focus:border-indigo-500"
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold mb-1 block">Book type *</label>
+                  <select required value={newBook.bookType} onChange={(e) => setNewBook((prev) => ({ ...prev, bookType: e.target.value, customBookType: e.target.value === "Other" ? prev.customBookType : "" }))} className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm outline-none focus:border-indigo-500">
+                    <option value="" disabled>Select a type</option>
+                    {["Leadership", "Personal Development", "Business", "Finance", "Education", "History", "Fiction", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                  {newBook.bookType === "Other" && <input required type="text" maxLength={60} value={newBook.customBookType} onChange={(e) => setNewBook((prev) => ({ ...prev, customBookType: e.target.value }))} placeholder="Enter book type" className="mt-2 w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded-xl text-sm outline-none focus:border-indigo-500" />}
                 </div>
               </div>
 
