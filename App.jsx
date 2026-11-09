@@ -859,7 +859,7 @@ export default function App() {
       .some((value) => String(value || "").toLocaleLowerCase().includes(normalizedBookSearch)) &&
     (libraryFilter !== "reading" || hasReadingHistory(book.id)) &&
     (libraryFilter !== "audio" || book.pages.some((page) => page.audioUrl)) &&
-    (libraryFilter !== "text" || !book.isComingSoon && !book.pages.some((page) => page.audioUrl)) &&
+    (libraryFilter !== "text" || !book.isComingSoon) &&
     (libraryFilter !== "coming" || Boolean(book.isComingSoon)) &&
     (bookTypeFilter === "all" || getBookTypes(book).includes(bookTypeFilter)) &&
     (libraryFilter !== "favorites" || hasReadingHistory(book.id))
@@ -969,7 +969,7 @@ export default function App() {
                     type="button"
                     aria-pressed={libraryFilter === value}
                     onClick={() => setLibraryFilter(value)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold transition ${libraryFilter === value ? "border-indigo-600 bg-indigo-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600"}`}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-semibold transition ${libraryFilter === value ? "border-indigo-600 bg-indigo-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600"}`}
                   >{label}</button>)}
                 </nav>}
                 <div className="flex min-w-0 items-center gap-2">
