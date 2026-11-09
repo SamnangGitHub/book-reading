@@ -43,11 +43,43 @@ function bookCoverImage(book) {
   return book.coverImage || "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
 }
 
+function sampleCoverColor(imageUrl) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 32;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        context.drawImage(image, 0, 0, 32, 32);
+        const pixels = context.getImageData(0, 0, 32, 32).data;
+        const colors = new Map();
+        for (let index = 0; index < pixels.length; index += 4) {
+          const [red, green, blue, alpha] = pixels.slice(index, index + 4);
+          if (alpha < 200) continue;
+          const brightness = (red + green + blue) / 3;
+          if (brightness < 35 || brightness > 235) continue;
+          const key = [red, green, blue].map((channel) => Math.round(channel / 32) * 32).join(",");
+          colors.set(key, (colors.get(key) || 0) + 1);
+        }
+        const dominant = [...colors.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+        resolve(dominant ? `rgb(${dominant})` : "#57534e");
+      } catch {
+        resolve("#57534e");
+      }
+    };
+    image.onerror = () => resolve("#57534e");
+    image.src = imageUrl;
+  });
+}
+
 export default function App() {
   // Navigation State: 'library' | 'reader' | 'create'
   const [currentView, setCurrentView] = useState("library");
   const [libraryTab, setLibraryTab] = useState("home");
   const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [featuredSpineColor, setFeaturedSpineColor] = useState("#57534e");
   const featuredTouchStartX = useRef(null);
 
   // Books List
@@ -878,6 +910,14 @@ export default function App() {
   });
   const featuredBooks = books.filter((book) => !book.isHidden && !book.isComingSoon);
   const featuredBook = featuredBooks.length ? featuredBooks[featuredIndex % featuredBooks.length] : null;
+  useEffect(() => {
+    if (!featuredBook) return;
+    let cancelled = false;
+    sampleCoverColor(bookCoverImage(featuredBook)).then((color) => {
+      if (!cancelled) setFeaturedSpineColor(color);
+    });
+    return () => { cancelled = true; };
+  }, [featuredBook?.id, featuredBook?.coverImage]);
   const audioReadyBooks = books.filter((book) => !book.isHidden && !book.isComingSoon && book.pages.some((page) => page.audioUrl));
 
   return (
@@ -912,10 +952,10 @@ export default function App() {
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[360px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
                   <div className="relative flex h-[94%] w-[min(76vw,330px)] shrink-0 items-stretch -rotate-2 transition-transform duration-500 hover:rotate-0 [filter:drop-shadow(-18px_30px_22px_rgba(0,0,0,.65))]">
-                    <div aria-hidden="true" className="relative z-10 flex w-[15%] min-w-[38px] shrink-0 flex-col items-center justify-between overflow-hidden rounded-l-sm border-r border-black/45 bg-slate-700 px-1.5 py-5 text-[8px] font-bold uppercase tracking-[.12em] text-white shadow-inner [writing-mode:vertical-rl]">
-                      <span className="absolute inset-0 z-0 bg-cover bg-left opacity-80" style={{ backgroundImage: `linear-gradient(90deg,rgba(0,0,0,.34),rgba(255,255,255,.18) 42%,rgba(0,0,0,.5)),url("${bookCoverImage(featuredBook)}")` }} />
-                      <span className="relative z-10 max-h-[46%] overflow-hidden text-ellipsis whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,.9)]">{featuredBook.author || "Khmer Reader"}</span>
-                      <span className="relative z-10 max-h-[46%] overflow-hidden text-ellipsis whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,.9)]">{featuredBook.title}</span>
+                    <div aria-label={`${featuredBook.title} by ${featuredBook.author || "Khmer Reader"}`} className="relative z-10 flex w-[18%] min-w-[50px] shrink-0 flex-col items-center justify-between overflow-hidden rounded-l-sm border-r border-black/45 px-1.5 py-5 text-[9px] font-bold uppercase tracking-[.12em] text-white shadow-inner" style={{ backgroundColor: featuredSpineColor }}>
+                      <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/40 via-white/10 to-black/45" />
+                      <span className="relative z-10 max-h-[46%] overflow-hidden text-ellipsis whitespace-nowrap [writing-mode:vertical-rl] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]">{featuredBook.author || "Khmer Reader"}</span>
+                      <span className="relative z-10 max-h-[46%] overflow-hidden text-ellipsis whitespace-nowrap [writing-mode:vertical-rl] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]">{featuredBook.title}</span>
                     </div>
                     <div aria-hidden="true" className="absolute -right-2 top-1 bottom-1 w-2.5 skew-y-6 rounded-r-sm border-l border-slate-300/50 bg-gradient-to-r from-amber-50 via-white to-slate-300 shadow-inner" />
                     <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative z-[1] h-full min-w-0 flex-1 overflow-hidden rounded-r-md border-y border-r border-white/20 bg-slate-900 shadow-2xl">
