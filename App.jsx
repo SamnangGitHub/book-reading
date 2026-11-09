@@ -911,11 +911,8 @@ export default function App() {
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[340px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
-                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative h-[94%] w-[min(68vw,330px)] shrink-0 overflow-visible rounded-r-md bg-gradient-to-r from-[#49330f] via-[#b78a32] to-[#e3c56f] p-[5px] pl-[13px] shadow-[12px_18px_28px_rgba(0,0,0,.7)]">
-                    <span aria-hidden="true" className="absolute -top-[7px] left-[14px] right-[5px] h-[9px] rounded-t-sm border-t border-[#fff1bd]/80 bg-gradient-to-b from-[#fff4c9] via-[#d9c58f] to-[#947638] shadow-[0_-2px_5px_rgba(0,0,0,.55)]" />
-                    <span aria-hidden="true" className="absolute inset-y-[5px] left-[3px] w-[10px] rounded-l-sm bg-gradient-to-r from-[#2d200d] via-[#9e7427] to-[#d4a83e] shadow-[inset_2px_0_4px_rgba(0,0,0,.6)]" />
-                    <span aria-hidden="true" className="absolute inset-y-[6px] right-0 w-[4px] bg-gradient-to-r from-[#d7c99f] to-[#fff8df]" />
-                    <img src={bookCoverImage(featuredBook)} alt={`${featuredBook.title} front cover`} className="relative z-[1] h-full w-full rounded-r-[3px] object-cover shadow-[inset_4px_0_7px_rgba(0,0,0,.4)]" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
+                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative h-[94%] w-[min(68vw,330px)] shrink-0 overflow-hidden rounded-md shadow-[0_18px_36px_rgba(0,0,0,.55)]">
+                    <img src={bookCoverImage(featuredBook)} alt={`${featuredBook.title} front cover`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
                   </button>
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
                 </div>
