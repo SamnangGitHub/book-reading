@@ -50,6 +50,7 @@ export default function App() {
   const [bookSearch, setBookSearch] = useState("");
   const [libraryFilter, setLibraryFilter] = useState("all");
   const [bookTypeFilter, setBookTypeFilter] = useState("all");
+  const [bookSort, setBookSort] = useState("newest");
   const [libraryLayout, setLibraryLayout] = useState("grid");
   const [showMainMenu, setShowMainMenu] = useState(false);
   const [pageJump, setPageJump] = useState("1");
@@ -862,7 +863,11 @@ export default function App() {
     (libraryFilter !== "coming" || Boolean(book.isComingSoon)) &&
     (bookTypeFilter === "all" || getBookTypes(book).includes(bookTypeFilter)) &&
     (libraryFilter !== "favorites" || hasReadingHistory(book.id))
-  );
+  ).sort((a, b) => {
+    if (bookSort === "title") return String(a.title || "").localeCompare(String(b.title || ""));
+    if (bookSort === "mostRead") return (Number(readingProgress[b.id]) || 0) - (Number(readingProgress[a.id]) || 0);
+    return books.indexOf(a) - books.indexOf(b);
+  });
 
   return (
     <div
@@ -963,6 +968,14 @@ export default function App() {
                       {bookTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
                   </label>}
+                  <label className="flex min-w-0 items-center gap-1.5 text-[10px] font-medium text-slate-500">
+                    <span className="shrink-0">Sort</span>
+                    <select value={bookSort} onChange={(event) => setBookSort(event.target.value)} aria-label="Sort books" className="w-28 rounded-xl border border-[#e9e4df] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 outline-none focus:border-violet-400">
+                      <option value="newest">Newest</option>
+                      <option value="mostRead">Most read</option>
+                      <option value="title">Title A–Z</option>
+                    </select>
+                  </label>
                   <div className="ml-auto flex shrink-0 rounded-xl border border-[#e9e4df] bg-white p-0.5">
                     <button aria-label="Grid view" aria-pressed={libraryLayout === "grid"} onClick={() => setLibraryLayout("grid")} className={`rounded-lg p-1.5 transition-colors ${libraryLayout === "grid" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-50"}`}><LayoutGrid className="h-4 w-4" /></button>
                     <button aria-label="List view" aria-pressed={libraryLayout === "list"} onClick={() => setLibraryLayout("list")} className={`rounded-lg p-1.5 transition-colors ${libraryLayout === "list" ? "bg-violet-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-50"}`}><List className="h-4 w-4" /></button>
@@ -992,7 +1005,7 @@ export default function App() {
               </div>
 
               {/* Grid of Books */}
-              <div className={libraryLayout === "grid" ? "grid grid-cols-1 sm:grid-cols-2 gap-2" : "grid grid-cols-1 gap-3"}>
+              <div className={libraryLayout === "grid" ? "grid grid-cols-2 lg:grid-cols-4 gap-3" : "grid grid-cols-1 gap-3"}>
                 {isLoadingBooks ? (
                   Array.from({ length: 4 }, (_, index) => (
                     <div key={index} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -1003,12 +1016,12 @@ export default function App() {
                 ) : filteredBooks.length ? filteredBooks.map((b) => (
                   <div
                     key={b.id}
-                    className={`group bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition relative ${libraryLayout === "grid" ? "flex flex-row" : "flex flex-col"}`}
+                    className={`group bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition relative ${libraryLayout === "grid" ? "flex flex-col" : "flex flex-row"}`}
                   >
                     {/* Book Cover */}
                     <div
                       onClick={() => { if (!b.isComingSoon) openReader(b.id); }}
-                      className={`${libraryLayout === "grid" ? "w-20 h-28 shrink-0" : "aspect-[3/4] w-full"} relative bg-slate-100 overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
+                      className={`${libraryLayout === "grid" ? "aspect-[3/4] w-full" : "w-24 h-32 shrink-0"} relative bg-slate-100 overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
                     >
                       <img
                         src={b.coverImage}
@@ -1019,9 +1032,9 @@ export default function App() {
                             "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
                         }}
                       />
-                      {libraryLayout !== "grid" && <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />}
+                      {libraryLayout === "grid" && <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />}
                       {b.isComingSoon && <span className={`absolute left-1 bottom-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[8px] font-extrabold text-amber-950 shadow ${libraryLayout !== "grid" ? "left-2 bottom-2 px-2.5 py-1 text-[10px]" : ""}`}>Coming soon</span>}
-                      <div className="absolute top-1 right-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-full text-[9px] text-white flex items-center space-x-1">
+                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
                         {b.pages.some((page) => page.audioUrl) && <span aria-label={`Audio narration on ${b.pages.filter((page) => page.audioUrl).length} of ${b.pages.length} pages`} title={`Audio narration on ${b.pages.filter((page) => page.audioUrl).length} of ${b.pages.length} pages`} className="relative inline-flex h-4 w-4 items-center justify-center text-white">
                           <Headphones aria-hidden="true" className="h-4 w-4" />
                           <Play aria-hidden="true" className="absolute h-1.5 w-1.5 fill-current" />
@@ -1029,11 +1042,11 @@ export default function App() {
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
                       </div>
-                      {libraryLayout !== "grid" && !b.isComingSoon && <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-6 h-6 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3 h-3 fill-current" /></button>}
+                      {libraryLayout === "grid" && !b.isComingSoon && <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-7 h-7 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3.5 h-3.5 fill-current" /></button>}
                     </div>
 
                     {/* Book Details */}
-                    <div className={`p-2.5 flex flex-col flex-1 justify-between min-w-0 ${libraryLayout === "grid" ? "py-2" : ""}`}>
+                    <div className={`p-2.5 flex flex-col flex-1 justify-between min-w-0 ${libraryLayout === "grid" ? "min-h-36" : "py-2"}`}>
                       <div onClick={() => { if (!b.isComingSoon) openReader(b.id); }} className={b.isComingSoon ? "" : "cursor-pointer"}>
                         <h3 className="text-[11px] font-bold line-clamp-1 group-hover:text-indigo-600 transition">
                           {b.title}
