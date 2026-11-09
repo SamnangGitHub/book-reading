@@ -309,7 +309,18 @@ export default function App() {
 
   // Audio Play / Pause Toggle
   const togglePlayAudio = () => {
-    if (!audioRef.current) return;
+    // Book narration (including the text-to-speech fallback) is for registered
+    // readers. Keep the reader itself available to guests and prompt them here.
+    if (!readerUser?.username) {
+      setAccountMode("login");
+      setAccountUsername("");
+      setAccountPhone("");
+      setAccountMessage("Sign in or create an account to listen to book audio.");
+      setShowAccountForm(true);
+      return;
+    }
+
+    if (!audioRef.current && currentPage?.audioUrl) return;
 
     if (isPlaying) {
       audioRef.current.pause();
@@ -331,6 +342,8 @@ export default function App() {
           window.speechSynthesis.speak(utterance);
           return;
         }
+        setAudioPlaybackError("Text-to-speech is not available in this browser.");
+        return;
       }
 
       setAudioPlaybackError("");
@@ -1177,7 +1190,7 @@ export default function App() {
           <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-5" onClick={(event) => { if (event.target === event.currentTarget) setShowAccountForm(false); }}>
             <form onSubmit={submitAccount} className={`w-full max-w-sm rounded-2xl p-5 shadow-xl ${currentTheme.card}`}>
               <h2 className="text-lg font-bold mb-1">{accountMode === "register" ? "Create account" : "Sign in"}</h2>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mb-4">Continue as a guest, or use your username and phone number to save reading history across devices.</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mb-4">Sign in or create an account to listen to book audio and save reading history across devices.</p>
               {readerUser && <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-3">Signed in as {readerUser.username}</p>}
               <label className="block text-xs font-semibold mb-1">Username</label>
               <input required minLength={2} maxLength={40} value={accountUsername} onChange={(e) => setAccountUsername(e.target.value)} className="w-full mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800" />
