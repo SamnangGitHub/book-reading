@@ -957,8 +957,8 @@ export default function App() {
               </label>
 
               <div className="space-y-1.5">
-                <div className="flex flex-wrap gap-1">
-                  {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio ready"], ["text", "Text only"], ["coming", "Coming soon"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
+                  <div className="flex flex-wrap gap-1">
+                    {[["all", `All Books (${books.filter((b) => !b.isHidden).length})`], ["reading", "Reading Now"], ["audio", "Audio ready"], ["text", "Text only"], ["coming", "Coming soon"], ["favorites", "Favorites"]].map(([key, label]) => <button key={key} onClick={() => setLibraryFilter(key)} className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium transition-colors ${libraryFilter === key ? "border-violet-600 bg-violet-600 text-white" : "border-[#e9e4df] bg-white text-slate-700 hover:border-violet-300"}`}>{label}</button>)}
                 </div>
                 <div className="flex min-w-0 items-center gap-2">
                   {bookTypes.length > 0 && <label className="flex min-w-0 items-center gap-2 text-[10px] font-medium text-slate-500">
