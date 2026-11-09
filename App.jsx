@@ -957,6 +957,21 @@ export default function App() {
               </label>
 
               <div className="space-y-1.5">
+                {!adminMode && <nav aria-label="Filter books" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {[
+                    ["all", "All books"],
+                    ["audio", "Audio ready"],
+                    ["text", "Available reading"],
+                    ["coming", "Coming soon"],
+                    ["favorites", "Favorites"]
+                  ].map(([value, label]) => <button
+                    key={value}
+                    type="button"
+                    aria-pressed={libraryFilter === value}
+                    onClick={() => setLibraryFilter(value)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold transition ${libraryFilter === value ? "border-indigo-600 bg-indigo-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600"}`}
+                  >{label}</button>)}
+                </nav>}
                 <div className="flex min-w-0 items-center gap-2">
                   {bookTypes.length > 0 && <label className="flex min-w-0 items-center gap-2 text-[10px] font-medium text-slate-500">
                     <span className="shrink-0">Book type</span>
