@@ -907,10 +907,11 @@ export default function App() {
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[340px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
-                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative h-[94%] w-auto max-w-[76vw] aspect-[0.66] shrink overflow-visible rounded-r-sm bg-gradient-to-r from-[#72521b] via-[#c99c39] to-[#e0b84f] p-[3px] pl-[8px] shadow-[0_22px_50px_rgba(0,0,0,.65)]">
-                    <span aria-hidden="true" className="absolute -top-[5px] left-[10px] right-[4px] h-[6px] rounded-t-sm bg-gradient-to-b from-[#f2dda0] to-[#a77b2c] shadow-[0_-2px_3px_rgba(0,0,0,.35)]" />
-                    <span aria-hidden="true" className="absolute inset-y-[3px] left-[2px] w-[6px] rounded-l-sm bg-gradient-to-r from-[#49330f] via-[#b78a32] to-[#d9ad48] shadow-inner" />
-                    <img src={featuredBook.coverImage} alt={featuredBook.title} className="relative z-[1] h-full w-full rounded-r-[2px] object-cover shadow-[inset_3px_0_5px_rgba(0,0,0,.28)]" />
+                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative h-[94%] w-[min(68vw,330px)] shrink-0 overflow-visible rounded-r-md bg-gradient-to-r from-[#49330f] via-[#b78a32] to-[#e3c56f] p-[5px] pl-[13px] shadow-[12px_18px_28px_rgba(0,0,0,.7)]">
+                    <span aria-hidden="true" className="absolute -top-[7px] left-[14px] right-[5px] h-[9px] rounded-t-sm border-t border-[#fff1bd]/80 bg-gradient-to-b from-[#fff4c9] via-[#d9c58f] to-[#947638] shadow-[0_-2px_5px_rgba(0,0,0,.55)]" />
+                    <span aria-hidden="true" className="absolute inset-y-[5px] left-[3px] w-[10px] rounded-l-sm bg-gradient-to-r from-[#2d200d] via-[#9e7427] to-[#d4a83e] shadow-[inset_2px_0_4px_rgba(0,0,0,.6)]" />
+                    <span aria-hidden="true" className="absolute inset-y-[6px] right-0 w-[4px] bg-gradient-to-r from-[#d7c99f] to-[#fff8df]" />
+                    <img src={featuredBook.coverImage} alt={featuredBook.title} className="relative z-[1] h-full w-full rounded-r-[3px] object-cover shadow-[inset_4px_0_7px_rgba(0,0,0,.4)]" />
                   </button>
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
                 </div>
