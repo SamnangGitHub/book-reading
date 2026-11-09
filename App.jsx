@@ -39,6 +39,10 @@ import {
   List
 } from "lucide-react";
 
+function bookCoverImage(book) {
+  return book.coverImage || "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
+}
+
 export default function App() {
   // Navigation State: 'library' | 'reader' | 'create'
   const [currentView, setCurrentView] = useState("library");
@@ -901,7 +905,7 @@ export default function App() {
                 setFeaturedIndex((index) => (index + (deltaX < 0 ? 1 : -1) + featuredBooks.length) % featuredBooks.length);
               }}
             >
-              <div className="absolute inset-0 bg-cover bg-center opacity-45 blur-[2px] scale-110" style={{ backgroundImage: featuredBook ? `url(${featuredBook.coverImage})` : "linear-gradient(135deg,#49351d,#131313)" }} />
+              <div className="absolute inset-0 bg-cover bg-center opacity-45 blur-[2px] scale-110" style={{ backgroundImage: featuredBook ? `url(${bookCoverImage(featuredBook)})` : "linear-gradient(135deg,#49351d,#131313)" }} />
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/95" />
               <header className="relative z-10 flex items-center justify-between px-6 py-4"><span className="font-serif text-2xl italic">Khmer Reader</span><button onClick={() => setLibraryTab("search")} aria-label="Search books" className="rounded-full p-2"><Search /></button></header>
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
@@ -911,7 +915,7 @@ export default function App() {
                     <span aria-hidden="true" className="absolute -top-[7px] left-[14px] right-[5px] h-[9px] rounded-t-sm border-t border-[#fff1bd]/80 bg-gradient-to-b from-[#fff4c9] via-[#d9c58f] to-[#947638] shadow-[0_-2px_5px_rgba(0,0,0,.55)]" />
                     <span aria-hidden="true" className="absolute inset-y-[5px] left-[3px] w-[10px] rounded-l-sm bg-gradient-to-r from-[#2d200d] via-[#9e7427] to-[#d4a83e] shadow-[inset_2px_0_4px_rgba(0,0,0,.6)]" />
                     <span aria-hidden="true" className="absolute inset-y-[6px] right-0 w-[4px] bg-gradient-to-r from-[#d7c99f] to-[#fff8df]" />
-                    <img src={featuredBook.coverImage} alt={featuredBook.title} className="relative z-[1] h-full w-full rounded-r-[3px] object-cover shadow-[inset_4px_0_7px_rgba(0,0,0,.4)]" />
+                    <img src={bookCoverImage(featuredBook)} alt={`${featuredBook.title} front cover`} className="relative z-[1] h-full w-full rounded-r-[3px] object-cover shadow-[inset_4px_0_7px_rgba(0,0,0,.4)]" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
                   </button>
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
                 </div>
@@ -1040,7 +1044,7 @@ export default function App() {
                 <div className="flex items-end justify-between"><div><h2 className="text-sm font-bold">Recommended for you</h2><p className="text-[10px] text-slate-500">Based on the books you’ve read</p></div></div>
                 <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Recommended books; scroll horizontally">
                   {recommendedBooks.map((book) => <button key={book.id} type="button" onClick={() => openReader(book.id)} aria-label={`Read ${book.title}`} className="w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                    <img src={book.coverImage} alt="" className="aspect-[3/4] w-full object-cover" onError={(event) => { event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
+                    <img src={bookCoverImage(book)} alt={`${book.title} front cover`} className="aspect-[3/4] w-full object-cover" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
                   </button>)}
                 </div>
               </section>}
@@ -1077,12 +1081,12 @@ export default function App() {
                       className={`${libraryLayout === "grid" ? "aspect-[3/4] w-full" : "w-24 h-32 shrink-0"} relative bg-slate-100 overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
                     >
                       <img
-                        src={b.coverImage}
+                        src={bookCoverImage(b)}
                         alt={b.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         onError={(e) => {
-                          e.target.src =
-                            "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
+                          e.target.onerror = null;
+                          e.target.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
                         }}
                       />
                       {libraryLayout === "grid" && <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />}
