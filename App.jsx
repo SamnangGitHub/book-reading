@@ -79,6 +79,7 @@ export default function App() {
   const [accountUsername, setAccountUsername] = useState("");
   const [accountPhone, setAccountPhone] = useState("");
   const [accountMessage, setAccountMessage] = useState("");
+  const [showRegisterOffer, setShowRegisterOffer] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -141,6 +142,7 @@ export default function App() {
     if (!apiConfigured) { setAccountMessage("Accounts require the app API. Configure VITE_API_URL first."); return; }
     setAccountBusy(true);
     setAccountMessage("");
+    setShowRegisterOffer(false);
     try {
       const result = await userAccount(accountMode === "register" ? "register" : "login", { username: accountUsername, phone: accountPhone });
       const user = result.user;
@@ -149,7 +151,10 @@ export default function App() {
       setShowAccountForm(false);
       setAccountPhone("");
       setAccountMessage(`Signed in as ${user.username}. Refreshing reading history…`);
-    } catch (error) { setAccountMessage(error.message); }
+    } catch (error) {
+      setAccountMessage(error.message);
+      setShowRegisterOffer(accountMode === "login" && error.status === 401);
+    }
     finally { setAccountBusy(false); }
   };
 
@@ -309,8 +314,8 @@ export default function App() {
 
   // Audio Play / Pause Toggle
   const togglePlayAudio = () => {
-    // Book narration (including the text-to-speech fallback) is for registered
-    // readers. Keep the reader itself available to guests and prompt them here.
+    // Book narration is for registered readers. Keep the reader itself
+    // available to guests and prompt them here.
     if (!readerUser?.username) {
       setAccountMode("login");
       setAccountUsername("");
@@ -320,32 +325,15 @@ export default function App() {
       return;
     }
 
-    if (!audioRef.current && currentPage?.audioUrl) return;
+    if (!currentPage?.audioUrl || !audioRef.current) {
+      setAudioPlaybackError("Audio is not available for this page yet.");
+      return;
+    }
 
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      // If no audio file uploaded for this page, provide SpeechSynthesis fallback for original text
-      if (!currentPage?.audioUrl) {
-        if ("speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-          const utteranceText =
-            displayMode === "khmer"
-              ? currentPage?.khmerText
-              : currentPage?.originalText;
-          const utterance = new SpeechSynthesisUtterance(utteranceText);
-          utterance.rate = playbackSpeed;
-          utterance.onend = () => setIsPlaying(false);
-          utterance.onerror = () => setIsPlaying(false);
-          setIsPlaying(true);
-          window.speechSynthesis.speak(utterance);
-          return;
-        }
-        setAudioPlaybackError("Text-to-speech is not available in this browser.");
-        return;
-      }
-
       setAudioPlaybackError("");
       audioRef.current
         .play()
@@ -1197,9 +1185,16 @@ export default function App() {
               <label className="block text-xs font-semibold mb-1">Phone number</label>
               <input required type="tel" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} placeholder="+855..." className="w-full mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800" />
               {accountMessage && <p role="status" className="text-xs mb-3 text-indigo-600 dark:text-indigo-400">{accountMessage}</p>}
+              {showRegisterOffer && <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                <p className="font-semibold">Would you like to create an account with these details?</p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => { setAccountMode("register"); setShowRegisterOffer(false); setAccountMessage("Create an account using the username and phone number above."); }} className="rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white">Yes, register</button>
+                  <button type="button" onClick={() => setShowRegisterOffer(false)} className="rounded-lg border border-amber-300 px-3 py-2 font-semibold">No, go back</button>
+                </div>
+              </div>}
               {readerUser && <button type="button" disabled={historyBusy} onClick={() => void refreshReaderHistory()} className="w-full py-2 text-xs text-indigo-600 dark:text-indigo-400 disabled:opacity-60">{historyBusy ? "Refreshing history…" : "Refresh reading history"}</button>}
               <button disabled={accountBusy} className="w-full py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-60">{accountBusy ? "Please wait…" : accountMode === "register" ? "Register" : "Sign in"}</button>
-              <button type="button" onClick={() => { setAccountMode(accountMode === "register" ? "login" : "register"); setAccountMessage(""); }} className="w-full py-2 text-xs text-indigo-600 dark:text-indigo-400">{accountMode === "register" ? "Already registered? Sign in" : "New here? Register"}</button>
+              <button type="button" onClick={() => { setAccountMode(accountMode === "register" ? "login" : "register"); setAccountMessage(""); setShowRegisterOffer(false); }} className="w-full py-2 text-xs text-indigo-600 dark:text-indigo-400">{accountMode === "register" ? "Already registered? Sign in" : "New here? Register"}</button>
               {readerUser && <button type="button" onClick={signOutReader} className="w-full py-2 text-xs text-slate-500">Sign out</button>}
               <button type="button" onClick={() => setShowAccountForm(false)} className="w-full py-1 text-xs text-slate-400">Continue as guest</button>
             </form>
@@ -1427,8 +1422,10 @@ export default function App() {
                   {/* Play / Pause Button */}
                   <button
                     onClick={togglePlayAudio}
-                    className="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 transition"
-                    title={isPlaying ? "Pause Narration" : "Listen to Narration"}
+                    disabled={!currentPage?.audioUrl}
+                    className="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 transition disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                    title={isPlaying ? "Pause Narration" : currentPage?.audioUrl ? "Listen to Narration" : "Audio is not available yet"}
+                    aria-label={isPlaying ? "Pause narration" : currentPage?.audioUrl ? "Listen to narration" : "Audio is not available yet"}
                   >
                     {isPlaying ? (
                       <Pause className="w-6 h-6 fill-current" />
@@ -1472,7 +1469,7 @@ export default function App() {
                   <span className="text-rose-600" role="status">{audioPlaybackError}</span>
                 ) : currentPage?.audioUrl
                   ? `🎙️ ${currentPage.audioFileName || "Page voice track ready"}`
-                  : "🎙️ Using text-to-speech fallback"}
+                  : "🎙️ Audio is not available for this page yet."}
               </div>
             </div>
 
@@ -1577,7 +1574,7 @@ export default function App() {
                   {editingBookId ? "កែសម្រួលសៀវភៅ (Edit Book)" : "បង្កើតសៀវភៅថ្មី (New Book)"}
                 </h2>
                 {editingBookId && (
-                  <p className="text-[10px] text-indigo-600 font-medium">{newBook.pages.filter((page) => page.audioUrl).length} of {newBook.pages.length} pages have audio · pages without audio use text-to-speech. Open a page to edit it.</p>
+                  <p className="text-[10px] text-indigo-600 font-medium">{newBook.pages.filter((page) => page.audioUrl).length} of {newBook.pages.length} pages have audio · pages without audio are unavailable to listen to yet. Open a page to edit it.</p>
                 )}
                 {saveStatus && <p className="text-[10px] text-indigo-600" role="status" aria-live="polite">{saveStatus}</p>}
               </div>
@@ -1829,7 +1826,7 @@ export default function App() {
                       {/* Page Voice Audio File Upload */}
                       <div className="pt-1">
                         <p className={`mb-2 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${page.audioUrl ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300"}`}>
-                          {page.audioUrl ? "Audio narration attached · readers can listen" : "Text only · readers can use browser text-to-speech"}
+                          {page.audioUrl ? "Audio narration attached · readers can listen" : "Audio not available yet · readers cannot listen to this page"}
                         </p>
                         <label className="text-xs font-semibold text-slate-600 dark:text-zinc-300 block mb-1.5">
                           សំឡេងអានសម្រាប់ទំព័រនេះ (Page Audio Narration)
