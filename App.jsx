@@ -42,6 +42,8 @@ import {
 export default function App() {
   // Navigation State: 'library' | 'reader' | 'create'
   const [currentView, setCurrentView] = useState("library");
+  const [libraryTab, setLibraryTab] = useState("home");
+  const [featuredIndex, setFeaturedIndex] = useState(0);
 
   // Books List
   const [books, setBooks] = useState([]);
@@ -868,6 +870,9 @@ export default function App() {
     if (bookSort === "mostRead") return (Number(readingProgress[b.id]) || 0) - (Number(readingProgress[a.id]) || 0);
     return books.indexOf(a) - books.indexOf(b);
   });
+  const featuredBooks = books.filter((book) => !book.isHidden && !book.isComingSoon);
+  const featuredBook = featuredBooks.length ? featuredBooks[featuredIndex % featuredBooks.length] : null;
+  const audioReadyBooks = books.filter((book) => !book.isHidden && !book.isComingSoon && book.pages.some((page) => page.audioUrl));
 
   return (
     <div
@@ -881,8 +886,23 @@ export default function App() {
         {/* ========================================================= */}
         {currentView === "library" && (
           <div className="flex-1 flex flex-col">
+            {libraryTab === "home" && <main className="relative flex min-h-[calc(100vh-62px)] flex-col overflow-hidden bg-[#171512] text-white">
+              <div className="absolute inset-0 bg-cover bg-center opacity-45 blur-[2px] scale-110" style={{ backgroundImage: featuredBook ? `url(${featuredBook.coverImage})` : "linear-gradient(135deg,#49351d,#131313)" }} />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/95" />
+              <header className="relative z-10 flex items-center justify-between px-6 py-4"><span className="font-serif text-2xl italic">Khmer Reader</span><button onClick={() => setLibraryTab("search")} aria-label="Search books" className="rounded-full p-2"><Search /></button></header>
+              {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
+                <div className="flex h-[min(58vh,520px)] w-full max-w-[340px] items-center justify-center">
+                  {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
+                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="h-full max-h-full overflow-hidden rounded-sm shadow-[0_25px_70px_rgba(0,0,0,.7)]"><img src={featuredBook.coverImage} alt={featuredBook.title} className="h-full w-auto max-w-[76vw] object-contain" /></button>
+                  {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
+                </div>
+                <div className="mt-5 flex gap-1.5">{featuredBooks.slice(0, 9).map((book, index) => <button key={book.id} aria-label={`Show ${book.title}`} onClick={() => setFeaturedIndex(index)} className={`h-1.5 rounded-full ${index === featuredIndex % featuredBooks.length ? "w-5 bg-white" : "w-1.5 bg-white/40"}`} />)}</div>
+                <h1 className="mt-4 text-2xl font-semibold">{featuredBook.title}</h1><p className="mt-1 text-sm text-white/70">{featuredBook.author || "Khmer Reader collection"}</p>
+                <span className="mt-3 rounded-full bg-white/15 px-3 py-1 text-xs text-white/85">{featuredBook.pages.some((page) => page.audioUrl) ? "◉  Ready to Read · Audio" : "◉  Ready to Read"}</span>
+              </div> : <div className="relative z-10 flex flex-1 items-center justify-center text-white/70">{isLoadingBooks ? "Loading your books…" : "Your books will appear here"}</div>}
+            </main>}
             {/* Header */}
-            <header className={`sticky top-0 z-20 backdrop-blur-md px-4 sm:px-5 py-3 flex items-center justify-between border-b ${theme === "dark" ? "bg-zinc-950/95 border-zinc-800" : "bg-white/95 border-slate-200"}`}>
+            <header className={`${libraryTab === "home" ? "hidden" : ""} sticky top-0 z-20 backdrop-blur-md px-4 sm:px-5 py-3 flex items-center justify-between border-b ${theme === "dark" ? "bg-zinc-950/95 border-zinc-800" : "bg-white/95 border-slate-200"}`}>
               <div className="flex items-center space-x-2.5">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
                   <Languages className="w-4 h-4" />
@@ -907,7 +927,7 @@ export default function App() {
               </div>
             </header>
 
-            {showMainMenu && <div className={`sticky top-[61px] z-20 border-b px-4 py-3 shadow-sm ${currentTheme.card} ${currentTheme.border}`}>
+            {(showMainMenu || libraryTab === "profile") && <div className={`sticky top-[61px] z-20 border-b px-4 py-3 shadow-sm ${currentTheme.card} ${currentTheme.border}`}>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <button onClick={() => { setLibraryFilter("all"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Library</button>
                 <button onClick={() => { setLibraryFilter("audio"); setShowMainMenu(false); }} className="rounded-lg border px-3 py-2 text-left">Audio ready</button>
@@ -921,14 +941,14 @@ export default function App() {
               </div>
             </div>}
 
-            {!readerUser && <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-xs text-indigo-950">
+            {libraryTab !== "home" && libraryTab !== "profile" && !readerUser && <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-xs text-indigo-950">
               <p><strong>Keep your place on every device.</strong> Sign in to sync your reading progress.</p>
               <button onClick={() => { setAccountMode("register"); setAccountMessage(""); setShowAccountForm(true); }} className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white">Save progress</button>
             </div>}
-            {installMessage && <div role="status" className="mx-4 mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><span>{installMessage}</span><button aria-label="Dismiss install message" onClick={() => setInstallMessage("")}><X className="h-4 w-4" /></button></div>}
+            {libraryTab !== "home" && installMessage && <div role="status" className="mx-4 mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><span>{installMessage}</span><button aria-label="Dismiss install message" onClick={() => setInstallMessage("")}><X className="h-4 w-4" /></button></div>}
 
             {/* Content List */}
-            <div className="p-4 space-y-4 flex-1">
+            <div className={`p-4 space-y-4 flex-1 ${libraryTab === "home" || libraryTab === "profile" ? "hidden" : ""}`}>
               {storageMessage && <p className="text-[11px] text-rose-600 dark:text-rose-400" role="status">{storageMessage}</p>}
               {/* Banner */}
               <div className="p-5 sm:p-7 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 text-white shadow-lg relative overflow-hidden">
@@ -1122,6 +1142,13 @@ export default function App() {
                 )}
               </div>
             </div>
+          <nav aria-label="Main navigation" className="fixed bottom-0 z-40 flex w-full max-w-5xl items-end justify-around border-t border-white/10 bg-[#100f0e]/95 px-3 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 text-[10px] text-white shadow-[0_-8px_24px_rgba(0,0,0,.18)] backdrop-blur-md">
+            <button onClick={() => { setLibraryTab("home"); setShowMainMenu(false); }} className={`flex min-w-14 flex-col items-center gap-1 py-1 ${libraryTab === "home" ? "text-amber-300" : "text-white/65"}`}><BookOpen className="h-5 w-5" />Home</button>
+            <button onClick={() => { setLibraryTab("list"); setLibraryFilter("all"); setShowMainMenu(false); }} className={`flex min-w-14 flex-col items-center gap-1 py-1 ${libraryTab === "list" ? "text-amber-300" : "text-white/65"}`}><List className="h-5 w-5" />List</button>
+            <button aria-label="Show audio ready books" onClick={() => { setLibraryTab("list"); setLibraryFilter("audio"); setShowMainMenu(false); }} className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full border-4 border-[#100f0e] bg-amber-200 text-[#291f11] shadow-lg"><Play className="h-6 w-6 fill-current" /></button>
+            <button onClick={() => { setLibraryTab("search"); setShowMainMenu(false); }} className={`flex min-w-14 flex-col items-center gap-1 py-1 ${libraryTab === "search" ? "text-amber-300" : "text-white/65"}`}><Search className="h-5 w-5" />Search</button>
+            <button onClick={() => { setLibraryTab("profile"); setShowMainMenu(false); }} className={`flex min-w-14 flex-col items-center gap-1 py-1 ${libraryTab === "profile" ? "text-amber-300" : "text-white/65"}`}><Settings className="h-5 w-5" />Profile</button>
+          </nav>
           </div>
         )}
 
