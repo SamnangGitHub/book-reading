@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi, userAccount, saveReadingProgress, loadReadingProgress } from "./src/bookApi.js";
+import { apiConfigured, adminLogin, loadBooks, loadAdminBooks, saveBook as saveBookToApi, deleteBook as deleteBookFromApi, userAccount, saveReadingProgress, loadReadingProgress, recordPageVisit } from "./src/bookApi.js";
 import {
   BookOpen,
   Plus,
@@ -84,6 +84,25 @@ export default function App() {
   const [historyBusy, setHistoryBusy] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [installMessage, setInstallMessage] = useState("");
+  const [pageVisitCount, setPageVisitCount] = useState(null);
+
+  useEffect(() => {
+    if (!apiConfigured) return;
+    let cancelled = false;
+    try {
+      let sessionId = sessionStorage.getItem("khmer-reader-visit-session");
+      if (!sessionId) {
+        sessionId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+        sessionStorage.setItem("khmer-reader-visit-session", sessionId);
+      }
+      recordPageVisit(sessionId).then((result) => {
+        if (!cancelled) setPageVisitCount(result.visits);
+      }).catch(() => {});
+    } catch {
+      // The visit counter is optional; the reader remains usable if storage is unavailable.
+    }
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const handleInstallPrompt = (event) => {
@@ -210,6 +229,7 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef(null);
+  const autoAdvanceAudioRef = useRef(false);
 
   useEffect(() => {
     if (!apiConfigured) return;
@@ -281,17 +301,20 @@ export default function App() {
     };
 
     const handleEnded = () => {
-      setIsPlaying(false);
       setPlaybackProgress(0);
       if (audioQueueActive) {
         const nextAudioIndex = currentBook?.pages.findIndex((page, index) => index > currentPageIndex && page.audioUrl) ?? -1;
         if (nextAudioIndex >= 0) {
+          autoAdvanceAudioRef.current = true;
           setCurrentPageIndex(nextAudioIndex);
-          setIsPlaying(true);
         } else {
+          setIsPlaying(false);
           setAudioQueueActive(false);
         }
-      } else if (currentPageIndex < (currentBook?.pages.length || 0) - 1) {
+      } else {
+        setIsPlaying(false);
+      }
+      if (!audioQueueActive && currentPageIndex < (currentBook?.pages.length || 0) - 1) {
         setCurrentPageIndex((prev) => prev + 1);
       }
     };
@@ -308,8 +331,9 @@ export default function App() {
   }, [currentPageIndex, currentBook, audioQueueActive]);
 
   useEffect(() => {
-    if (currentView !== "listen" || !isPlaying || !currentPage?.audioUrl || !audioRef.current) return;
+    if (currentView !== "listen" || !isPlaying || autoAdvanceAudioRef.current || !currentPage?.audioUrl || !audioRef.current) return;
     audioRef.current.play().catch((err) => {
+      if (err.name === "AbortError") return;
       setAudioPlaybackError(`Audio could not play: ${err.message || "check the audio file access and format."}`);
       setIsPlaying(false);
     });
@@ -320,7 +344,11 @@ export default function App() {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      setIsPlaying(false);
+      if (autoAdvanceAudioRef.current) {
+        audioRef.current.load();
+      } else {
+        setIsPlaying(false);
+      }
       setPlaybackProgress(0);
     }
     setAudioPlaybackError("");
@@ -1019,6 +1047,12 @@ export default function App() {
               </div>
             </div>}
 
+            {libraryTab === "profile" && <section aria-label="Page visits" className={`mx-4 mt-3 rounded-xl border p-4 ${currentTheme.card} ${currentTheme.border}`}>
+              <h2 className="text-sm font-bold">Page visits</h2>
+              <p className="mt-1 text-2xl font-extrabold text-indigo-600">{pageVisitCount == null ? "—" : pageVisitCount.toLocaleString()}</p>
+              <p className={`text-[10px] ${currentTheme.subtext}`}>Visitor sessions recorded</p>
+            </section>}
+
             {libraryTab !== "home" && libraryTab !== "profile" && !readerUser && <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-xs text-indigo-950">
               <p><strong>Keep your place on every device.</strong> Sign in to sync your reading progress.</p>
               <button onClick={() => { setAccountMode("register"); setAccountMessage(""); setShowAccountForm(true); }} className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white">Save progress</button>
@@ -1268,7 +1302,21 @@ export default function App() {
                 src={currentPage.audioUrl}
                 preload="metadata"
                 muted={isMuted}
+                onCanPlay={() => {
+                  if (!autoAdvanceAudioRef.current || !audioRef.current) return;
+                  audioRef.current.play().then(() => {
+                    autoAdvanceAudioRef.current = false;
+                    setIsPlaying(true);
+                    setAudioPlaybackError("");
+                  }).catch((err) => {
+                    if (err.name === "AbortError") return;
+                    autoAdvanceAudioRef.current = false;
+                    setIsPlaying(false);
+                    setAudioPlaybackError(`Audio could not play: ${err.message || "check the audio file access and format."}`);
+                  });
+                }}
                 onError={() => {
+                  autoAdvanceAudioRef.current = false;
                   setIsPlaying(false);
                   const isRawAac = currentPage.audioFileName?.toLowerCase().endsWith(".aac");
                   setAudioPlaybackError(isRawAac
