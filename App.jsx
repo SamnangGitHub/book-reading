@@ -911,7 +911,7 @@ export default function App() {
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[360px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
-                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="h-[94%] w-[min(76vw,330px)] shrink-0 overflow-hidden rounded-md bg-slate-900 shadow-[0_24px_48px_rgba(0,0,0,.55)] ring-1 ring-white/20">
+                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="h-[94%] w-[min(76vw,330px)] shrink-0 overflow-hidden rounded-md shadow-[0_24px_48px_rgba(0,0,0,.55)]">
                     <img src={bookCoverImage(featuredBook)} alt={`${featuredBook.title} cover`} className="h-full w-full object-contain" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
                   </button>
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
@@ -1040,8 +1040,8 @@ export default function App() {
               {!adminMode && libraryFilter === "all" && recommendedBooks.length > 0 && <section aria-label="Recommended from your reading history" className="space-y-2">
                 <div className="flex items-end justify-between"><div><h2 className="text-sm font-bold">Recommended for you</h2><p className="text-[10px] text-slate-500">Based on the books you’ve read</p></div></div>
                 <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Recommended books; scroll horizontally">
-                  {recommendedBooks.map((book) => <button key={book.id} type="button" onClick={() => openReader(book.id)} aria-label={`Read ${book.title}`} className="w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                    <img src={bookCoverImage(book)} alt={`${book.title} front cover`} className="aspect-[3/4] w-full object-cover" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
+                  {recommendedBooks.map((book) => <button key={book.id} type="button" onClick={() => openReader(book.id)} aria-label={`Read ${book.title}`} className="w-24 shrink-0 overflow-hidden rounded-xl text-left transition hover:-translate-y-0.5">
+                    <img src={bookCoverImage(book)} alt={`${book.title} front cover`} className="aspect-[3/4] w-full object-contain" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
                   </button>)}
                 </div>
               </section>}
@@ -1075,18 +1075,17 @@ export default function App() {
                     {/* Book Cover */}
                     <div
                       onClick={() => { if (!b.isComingSoon) openReader(b.id); }}
-                      className={`${libraryLayout === "grid" ? "aspect-[3/4] w-full" : "w-24 h-32 shrink-0"} relative bg-slate-100 overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
+                      className={`${libraryLayout === "grid" ? "aspect-[3/4] w-full" : "w-24 h-32 shrink-0"} relative overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
                     >
                       <img
                         src={bookCoverImage(b)}
                         alt={b.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80";
                         }}
                       />
-                      {libraryLayout === "grid" && <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/45 to-transparent pointer-events-none" />}
                       {b.isComingSoon && <span className={`absolute left-1 bottom-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[8px] font-extrabold text-amber-950 shadow ${libraryLayout !== "grid" ? "left-2 bottom-2 px-2.5 py-1 text-[10px]" : ""}`}>Coming soon</span>}
                       <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white flex items-center space-x-1">
                         {b.pages.some((page) => page.audioUrl) && <span aria-label={`Audio narration on ${b.pages.filter((page) => page.audioUrl).length} of ${b.pages.length} pages`} title={`Audio narration on ${b.pages.filter((page) => page.audioUrl).length} of ${b.pages.length} pages`} className="relative inline-flex h-4 w-4 items-center justify-center text-white">
