@@ -44,6 +44,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState("library");
   const [libraryTab, setLibraryTab] = useState("home");
   const [featuredIndex, setFeaturedIndex] = useState(0);
+  const featuredTouchStartX = useRef(null);
 
   // Books List
   const [books, setBooks] = useState([]);
@@ -886,7 +887,19 @@ export default function App() {
         {/* ========================================================= */}
         {currentView === "library" && (
           <div className="flex-1 flex flex-col">
-            {libraryTab === "home" && <main className="relative flex min-h-[calc(100vh-62px)] flex-col overflow-hidden bg-[#171512] text-white">
+            {libraryTab === "home" && <main
+              className="relative flex h-[calc(100dvh-72px)] min-h-[520px] flex-col overflow-hidden bg-[#171512] text-white"
+              onTouchStart={(event) => { featuredTouchStartX.current = event.touches[0]?.clientX ?? null; }}
+              onTouchEnd={(event) => {
+                const startX = featuredTouchStartX.current;
+                featuredTouchStartX.current = null;
+                const endX = event.changedTouches[0]?.clientX;
+                if (startX == null || endX == null || featuredBooks.length < 2) return;
+                const deltaX = endX - startX;
+                if (Math.abs(deltaX) < 45) return;
+                setFeaturedIndex((index) => (index + (deltaX < 0 ? 1 : -1) + featuredBooks.length) % featuredBooks.length);
+              }}
+            >
               <div className="absolute inset-0 bg-cover bg-center opacity-45 blur-[2px] scale-110" style={{ backgroundImage: featuredBook ? `url(${featuredBook.coverImage})` : "linear-gradient(135deg,#49351d,#131313)" }} />
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/95" />
               <header className="relative z-10 flex items-center justify-between px-6 py-4"><span className="font-serif text-2xl italic">Khmer Reader</span><button onClick={() => setLibraryTab("search")} aria-label="Search books" className="rounded-full p-2"><Search /></button></header>
@@ -897,8 +910,10 @@ export default function App() {
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
                 </div>
                 <div className="mt-5 flex gap-1.5">{featuredBooks.slice(0, 9).map((book, index) => <button key={book.id} aria-label={`Show ${book.title}`} onClick={() => setFeaturedIndex(index)} className={`h-1.5 rounded-full ${index === featuredIndex % featuredBooks.length ? "w-5 bg-white" : "w-1.5 bg-white/40"}`} />)}</div>
-                <h1 className="mt-4 text-2xl font-semibold">{featuredBook.title}</h1><p className="mt-1 text-sm text-white/70">{featuredBook.author || "Khmer Reader collection"}</p>
-                <span className="mt-3 rounded-full bg-white/15 px-3 py-1 text-xs text-white/85">{featuredBook.pages.some((page) => page.audioUrl) ? "◉  Ready to Read · Audio" : "◉  Ready to Read"}</span>
+                <h1 className="mt-4 text-2xl font-semibold">{featuredBook.title}</h1>
+                {featuredBook.titleKhmer && <p lang="km" className="mt-1 text-lg font-medium text-white/90">{featuredBook.titleKhmer}</p>}
+                <p className="mt-1 text-sm text-white/70">{featuredBook.author || "Khmer Reader collection"}</p>
+                <span className="mt-3 rounded-full bg-white/15 px-3 py-1 text-xs text-white/85">{featuredBook.pages.some((page) => page.audioUrl) ? "◉  Ready to Read · Audio" : "◉  Ready to Read · Text"}</span>
               </div> : <div className="relative z-10 flex flex-1 items-center justify-center text-white/70">{isLoadingBooks ? "Loading your books…" : "Your books will appear here"}</div>}
             </main>}
             {/* Header */}
