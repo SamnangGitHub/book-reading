@@ -909,11 +909,19 @@ export default function App() {
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/95" />
               <header className="relative z-10 flex items-center justify-between px-6 py-4"><span className="font-serif text-2xl italic">Khmer Reader</span><button onClick={() => setLibraryTab("search")} aria-label="Search books" className="rounded-full p-2"><Search /></button></header>
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
-                <div className="flex h-[min(58vh,520px)] w-full max-w-[340px] items-center justify-center">
+                <div className="flex h-[min(58vh,520px)] w-full max-w-[360px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
-                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative h-[94%] w-[min(68vw,330px)] shrink-0 overflow-hidden rounded-md shadow-[0_18px_36px_rgba(0,0,0,.55)]">
-                    <img src={bookCoverImage(featuredBook)} alt={`${featuredBook.title} front cover`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
-                  </button>
+                  <div className="relative flex h-[94%] w-[min(76vw,330px)] shrink-0 items-stretch -rotate-2 transition-transform duration-500 hover:rotate-0 [filter:drop-shadow(-18px_30px_22px_rgba(0,0,0,.65))]">
+                    <div aria-hidden="true" className="relative z-10 flex w-[12%] shrink-0 flex-col justify-between overflow-hidden rounded-l-sm border-r border-black/40 bg-gradient-to-r from-slate-500 via-slate-300 to-slate-600 px-1 py-5 text-[7px] font-bold uppercase tracking-[.16em] text-slate-950 shadow-inner [writing-mode:vertical-rl]">
+                      <span className="truncate opacity-80">{featuredBook.author || "Khmer Reader"}</span>
+                      <span className="truncate">{featuredBook.title}</span>
+                    </div>
+                    <div aria-hidden="true" className="absolute -right-2 top-1 bottom-1 w-2.5 skew-y-6 rounded-r-sm border-l border-slate-300/50 bg-gradient-to-r from-amber-50 via-white to-slate-300 shadow-inner" />
+                    <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative z-[1] h-full min-w-0 flex-1 overflow-hidden rounded-r-md border-y border-r border-white/20 bg-slate-900 shadow-2xl">
+                      <img src={bookCoverImage(featuredBook)} alt={`${featuredBook.title} front cover`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
+                      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-r-md bg-gradient-to-tr from-transparent via-white/[.08] to-transparent" />
+                    </button>
+                  </div>
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
                 </div>
                 <div className="mt-5 flex gap-1.5">{featuredBooks.slice(0, 9).map((book, index) => <button key={book.id} aria-label={`Show ${book.title}`} onClick={() => setFeaturedIndex(index)} className={`h-1.5 rounded-full ${index === featuredIndex % featuredBooks.length ? "w-5 bg-white" : "w-1.5 bg-white/40"}`} />)}</div>
