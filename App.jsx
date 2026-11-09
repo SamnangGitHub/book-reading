@@ -847,7 +847,8 @@ export default function App() {
   const currentTheme = themeStyles[theme];
   useEffect(() => {
     localStorage.setItem("khmer-reader-theme", theme);
-    document.documentElement.style.background = theme === "dark" ? "#09090b" : theme === "reading" ? "#fbf0d9" : "#f8fafc";
+    // Keep the device/browser bands around the app black in every reader theme.
+    document.documentElement.style.background = "#000000";
   }, [theme]);
   const normalizedBookSearch = bookSearch.trim().toLocaleLowerCase();
   const getBookTypes = (book) => [...new Set(String(book.bookType || "Other").split(/[\/;,]+/).map((type) => type.trim()).filter(Boolean))];
@@ -877,10 +878,10 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen ${currentTheme.bg} ${currentTheme.text} flex justify-center font-sans transition-colors duration-200 antialiased`}
+      className={`min-h-screen bg-black ${currentTheme.text} flex justify-center font-sans transition-colors duration-200 antialiased`}
     >
       {/* Mobile Wrapper with fixed max-width for phone proportions */}
-      <div className={`w-full max-w-5xl min-h-screen flex flex-col relative ${theme === "dark" ? "bg-zinc-950" : theme === "reading" ? "bg-[#fbf0d9]" : "bg-slate-50"} shadow-2xl border-x border-black/5`}>
+      <div className={`w-full max-w-5xl min-h-screen flex flex-col relative ${theme === "dark" ? "bg-zinc-950" : theme === "reading" ? "bg-[#fbf0d9]" : "bg-slate-50"} shadow-2xl border-x border-black`}>
         
         {/* ========================================================= */}
         {/* VIEW 1: BOOK LIBRARY                                      */}
@@ -1157,7 +1158,7 @@ export default function App() {
                 )}
               </div>
             </div>
-          <nav aria-label="Main navigation" className="fixed bottom-0 z-40 flex w-full max-w-5xl items-end justify-around border-t border-white/10 bg-[#100f0e]/95 px-3 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 text-[10px] text-white shadow-[0_-8px_24px_rgba(0,0,0,.18)] backdrop-blur-md">
+          <nav aria-label="Main navigation" className="fixed bottom-0 z-40 flex w-full max-w-5xl items-end justify-around border-t border-black bg-[#100f0e]/95 px-3 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 text-[10px] text-white shadow-[0_-8px_24px_rgba(0,0,0,.18)] backdrop-blur-md">
             <button onClick={() => { setLibraryTab("home"); setShowMainMenu(false); }} className={`flex min-w-14 flex-col items-center gap-1 py-1 ${libraryTab === "home" ? "text-amber-300" : "text-white/65"}`}><BookOpen className="h-5 w-5" />Home</button>
             <button onClick={() => { setLibraryTab("list"); setLibraryFilter("all"); setShowMainMenu(false); }} className={`flex min-w-14 flex-col items-center gap-1 py-1 ${libraryTab === "list" ? "text-amber-300" : "text-white/65"}`}><List className="h-5 w-5" />List</button>
             <button aria-label="Show audio ready books" onClick={() => { setLibraryTab("list"); setLibraryFilter("audio"); setShowMainMenu(false); }} className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full border-4 border-[#100f0e] bg-amber-200 text-[#291f11] shadow-lg"><Play className="h-6 w-6 fill-current" /></button>
