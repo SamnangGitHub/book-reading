@@ -889,7 +889,7 @@ export default function App() {
         {currentView === "library" && (
           <div className="flex-1 flex flex-col">
             {libraryTab === "home" && <main
-              className="relative flex h-[calc(100dvh-72px)] min-h-[520px] flex-col overflow-hidden bg-[#171512] text-white"
+              className="relative flex h-[100dvh] min-h-[520px] flex-col overflow-hidden bg-black text-white"
               onTouchStart={(event) => { featuredTouchStartX.current = event.touches[0]?.clientX ?? null; }}
               onTouchEnd={(event) => {
                 const startX = featuredTouchStartX.current;
