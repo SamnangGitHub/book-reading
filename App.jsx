@@ -912,9 +912,10 @@ export default function App() {
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[360px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
                   <div className="relative flex h-[94%] w-[min(76vw,330px)] shrink-0 items-stretch -rotate-2 transition-transform duration-500 hover:rotate-0 [filter:drop-shadow(-18px_30px_22px_rgba(0,0,0,.65))]">
-                    <div aria-hidden="true" className="relative z-10 flex w-[12%] shrink-0 flex-col justify-between overflow-hidden rounded-l-sm border-r border-black/40 bg-gradient-to-r from-slate-500 via-slate-300 to-slate-600 px-1 py-5 text-[7px] font-bold uppercase tracking-[.16em] text-slate-950 shadow-inner [writing-mode:vertical-rl]">
-                      <span className="truncate opacity-80">{featuredBook.author || "Khmer Reader"}</span>
-                      <span className="truncate">{featuredBook.title}</span>
+                    <div aria-hidden="true" className="relative z-10 flex w-[15%] min-w-[38px] shrink-0 flex-col items-center justify-between overflow-hidden rounded-l-sm border-r border-black/45 bg-slate-700 px-1.5 py-5 text-[8px] font-bold uppercase tracking-[.12em] text-white shadow-inner [writing-mode:vertical-rl]">
+                      <span className="absolute inset-0 z-0 bg-cover bg-left opacity-80" style={{ backgroundImage: `linear-gradient(90deg,rgba(0,0,0,.34),rgba(255,255,255,.18) 42%,rgba(0,0,0,.5)),url("${bookCoverImage(featuredBook)}")` }} />
+                      <span className="relative z-10 max-h-[46%] overflow-hidden text-ellipsis whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,.9)]">{featuredBook.author || "Khmer Reader"}</span>
+                      <span className="relative z-10 max-h-[46%] overflow-hidden text-ellipsis whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,.9)]">{featuredBook.title}</span>
                     </div>
                     <div aria-hidden="true" className="absolute -right-2 top-1 bottom-1 w-2.5 skew-y-6 rounded-r-sm border-l border-slate-300/50 bg-gradient-to-r from-amber-50 via-white to-slate-300 shadow-inner" />
                     <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative z-[1] h-full min-w-0 flex-1 overflow-hidden rounded-r-md border-y border-r border-white/20 bg-slate-900 shadow-2xl">
