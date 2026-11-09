@@ -9,7 +9,11 @@ async function request(path, options = {}) {
     headers: { "Content-Type": "application/json", ...options.headers },
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || `API request failed (${response.status}).`);
+  if (!response.ok) {
+    const error = new Error(result.error || `API request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
   return result;
 }
 
