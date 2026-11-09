@@ -22,6 +22,14 @@ export async function loadBooks() {
   return result.books;
 }
 
+export async function recordPageVisit(sessionId) {
+  return request("/api/visits", { method: "POST", body: JSON.stringify({ sessionId }) });
+}
+
+export async function loadPageVisits() {
+  return request("/api/visits");
+}
+
 export async function loadAdminBooks(token) {
   const result = await request("/api/admin/books", {
     headers: { Authorization: `Bearer ${token}` },
