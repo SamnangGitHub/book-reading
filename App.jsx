@@ -206,6 +206,7 @@ export default function App() {
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioPlaybackError, setAudioPlaybackError] = useState("");
+  const [audioQueueActive, setAudioQueueActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef(null);
@@ -282,8 +283,15 @@ export default function App() {
     const handleEnded = () => {
       setIsPlaying(false);
       setPlaybackProgress(0);
-      // Auto advance to next page if available
-      if (currentPageIndex < (currentBook?.pages.length || 0) - 1) {
+      if (audioQueueActive) {
+        const nextAudioIndex = currentBook?.pages.findIndex((page, index) => index > currentPageIndex && page.audioUrl) ?? -1;
+        if (nextAudioIndex >= 0) {
+          setCurrentPageIndex(nextAudioIndex);
+          setIsPlaying(true);
+        } else {
+          setAudioQueueActive(false);
+        }
+      } else if (currentPageIndex < (currentBook?.pages.length || 0) - 1) {
         setCurrentPageIndex((prev) => prev + 1);
       }
     };
@@ -297,7 +305,15 @@ export default function App() {
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [currentPageIndex, currentBook]);
+  }, [currentPageIndex, currentBook, audioQueueActive]);
+
+  useEffect(() => {
+    if (currentView !== "listen" || !isPlaying || !currentPage?.audioUrl || !audioRef.current) return;
+    audioRef.current.play().catch((err) => {
+      setAudioPlaybackError(`Audio could not play: ${err.message || "check the audio file access and format."}`);
+      setIsPlaying(false);
+    });
+  }, [currentPageIndex, currentView, currentPage?.audioUrl, isPlaying]);
 
   // Handle Page Change Reset
   useEffect(() => {
@@ -367,9 +383,38 @@ export default function App() {
   // Switch to Reader View
   const openReader = (bookId) => {
     const book = books.find((item) => item.id === bookId);
+    setAudioQueueActive(false);
+    setIsPlaying(false);
     setActiveBookId(bookId);
     setCurrentPageIndex(Math.min(readingProgress[bookId] || 0, Math.max(0, (book?.pages.length || 1) - 1)));
     setCurrentView("reader");
+  };
+
+  const openBook = (bookId) => {
+    const book = books.find((item) => item.id === bookId);
+    if (book?.pages.some((page) => page.audioUrl)) {
+      const firstAudioIndex = book.pages.findIndex((page) => page.audioUrl);
+      setActiveBookId(bookId);
+      setCurrentPageIndex(firstAudioIndex);
+      setCurrentView("listen");
+      setAudioQueueActive(false);
+      setIsPlaying(false);
+    } else openReader(bookId);
+  };
+
+  const startAudioBook = () => {
+    if (!readerUser?.username) {
+      setAccountMode("login");
+      setAccountMessage("Sign in or create an account to listen to book audio.");
+      setShowAccountForm(true);
+      return;
+    }
+    const firstAudioIndex = currentBook?.pages.findIndex((page) => page.audioUrl) ?? -1;
+    if (firstAudioIndex < 0) return;
+    setAudioQueueActive(true);
+    setCurrentPageIndex(firstAudioIndex);
+    setIsPlaying(true);
+    setAudioPlaybackError("");
   };
 
   // Open Editor for an Existing Book
@@ -913,7 +958,7 @@ export default function App() {
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[360px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
-                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="h-[94%] w-[min(76vw,330px)] shrink-0 overflow-hidden rounded-md shadow-[0_24px_48px_rgba(0,0,0,.55)]">
+                  <button onClick={() => openBook(featuredBook.id)} aria-label={`${featuredBook.pages.some((page) => page.audioUrl) ? "Listen to" : "Read"} ${featuredBook.title}`} className="h-[94%] w-[min(76vw,330px)] shrink-0 overflow-hidden rounded-md shadow-[0_24px_48px_rgba(0,0,0,.55)]">
                     <img src={bookCoverImage(featuredBook)} alt={`${featuredBook.title} cover`} className="h-full w-full object-contain" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
                   </button>
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
@@ -1051,7 +1096,7 @@ export default function App() {
               {!adminMode && libraryFilter === "all" && recommendedBooks.length > 0 && <section aria-label="Recommended from your reading history" className="space-y-2">
                 <div className="flex items-end justify-between"><div><h2 className="text-sm font-bold">Recommended for you</h2><p className="text-[10px] text-slate-500">Based on the books you’ve read</p></div></div>
                 <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Recommended books; scroll horizontally">
-                  {recommendedBooks.map((book) => <button key={book.id} type="button" onClick={() => openReader(book.id)} aria-label={`Read ${book.title}`} className="w-24 shrink-0 overflow-hidden rounded-xl text-left transition hover:-translate-y-0.5">
+                  {recommendedBooks.map((book) => <button key={book.id} type="button" onClick={() => openBook(book.id)} aria-label={`Open ${book.title}`} className="w-24 shrink-0 overflow-hidden rounded-xl text-left transition hover:-translate-y-0.5">
                     <img src={bookCoverImage(book)} alt={`${book.title} front cover`} className="aspect-[3/4] w-full object-contain" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80"; }} />
                   </button>)}
                 </div>
@@ -1085,7 +1130,7 @@ export default function App() {
                   >
                     {/* Book Cover */}
                     <div
-                      onClick={() => { if (!b.isComingSoon) openReader(b.id); }}
+                      onClick={() => { if (!b.isComingSoon) openBook(b.id); }}
                       className={`${libraryLayout === "grid" ? "aspect-[3/4] w-full" : "w-24 h-32 shrink-0"} relative overflow-hidden ${b.isComingSoon ? "cursor-default" : "cursor-pointer"}`}
                     >
                       <img
@@ -1106,12 +1151,12 @@ export default function App() {
                         <BookOpen className="w-3 h-3" />
                         <span>{b.pages.length} pgs</span>
                       </div>
-                      {libraryLayout === "grid" && !b.isComingSoon && <button onClick={() => openReader(b.id)} aria-label={`Read ${b.title}`} className="absolute right-2 bottom-2 w-7 h-7 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3.5 h-3.5 fill-current" /></button>}
+                      {libraryLayout === "grid" && !b.isComingSoon && <button onClick={() => openBook(b.id)} aria-label={`${b.pages.some((page) => page.audioUrl) ? "Listen to" : "Read"} ${b.title}`} className="absolute right-2 bottom-2 w-7 h-7 rounded-full bg-white/95 text-indigo-600 flex items-center justify-center shadow"><Play className="w-3.5 h-3.5 fill-current" /></button>}
                     </div>
 
                     {/* Book Details */}
                     <div className={`p-2.5 flex flex-col flex-1 justify-between min-w-0 ${libraryLayout === "grid" ? "min-h-36" : "py-2"}`}>
-                      <div onClick={() => { if (!b.isComingSoon) openReader(b.id); }} className={b.isComingSoon ? "" : "cursor-pointer"}>
+                      <div onClick={() => { if (!b.isComingSoon) openBook(b.id); }} className={b.isComingSoon ? "" : "cursor-pointer"}>
                         <h3 className="text-[11px] font-bold line-clamp-1 group-hover:text-indigo-600 transition">
                           {b.title}
                         </h3>
@@ -1214,7 +1259,7 @@ export default function App() {
         {/* ========================================================= */}
         {/* VIEW 2: DUAL-LANGUAGE AUDIO READER                       */}
         {/* ========================================================= */}
-        {currentView === "reader" && (
+        {(currentView === "reader" || currentView === "listen") && (
           <div className="flex-1 flex flex-col h-[calc(100dvh-58px)]">
             {/* Hidden Audio Element */}
             {currentPage?.audioUrl && (
@@ -1243,6 +1288,7 @@ export default function App() {
                     audioRef.current.pause();
                     setIsPlaying(false);
                   }
+                  setAudioQueueActive(false);
                   setCurrentView("library");
                 }}
                 className="p-1.5 -ml-1 rounded-full hover:bg-black/5 active:scale-95 transition"
@@ -1266,6 +1312,7 @@ export default function App() {
 
               {/* Action Buttons: Edit Book & Reader Settings */}
               <div className="flex items-center space-x-1">
+                {currentView === "listen" && <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="rounded-full bg-indigo-600 px-2.5 py-1.5 text-[10px] font-semibold text-white">Read text</button>}
                 <button onClick={() => window.location.reload()} aria-label="Refresh app" title="Refresh app" className="p-2 rounded-full hover:bg-black/5 active:scale-95 transition"><RotateCcw className="w-4 h-4" /></button>
                 <button
                   onClick={() => {
@@ -1290,7 +1337,7 @@ export default function App() {
             </div>
 
             {/* Language Mode Selector (Original | Both | Khmer) */}
-            <div
+            {currentView === "reader" && <div
               className={`px-4 py-2 border-b flex items-center justify-between gap-1 text-xs font-medium ${currentTheme.card} ${currentTheme.border}`}
             >
               <button
@@ -1323,10 +1370,16 @@ export default function App() {
               >
                 ភាសាខ្មែរ
               </button>
-            </div>
+            </div>}
 
             {/* Page Reading Canvas */}
-            <div
+            {currentView === "listen" ? <div className={`flex-1 flex flex-col items-center justify-center gap-4 px-7 text-center ${currentTheme.card}`}>
+              <img src={bookCoverImage(currentBook || {})} alt={`${currentBook?.title} cover`} className="h-[min(42vh,360px)] max-w-[75vw] rounded-lg object-contain shadow-2xl" />
+              <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-indigo-500">Audiobook</p><h2 className="mt-1 text-lg font-bold">{currentBook?.title}</h2><p className="text-xs opacity-70">{currentBook?.author}</p></div>
+              <p className="text-xs opacity-70">Page {currentPageIndex + 1} of {currentBook?.pages.length} · Track {(currentBook?.pages.slice(0, currentPageIndex + 1).filter((page) => page.audioUrl).length || 1)} of {currentBook?.pages.filter((page) => page.audioUrl).length}</p>
+              <button onClick={startAudioBook} disabled={isPlaying} className="rounded-full bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-60">{isPlaying ? "Playing audiobook…" : "Play audiobook from first track"}</button>
+              <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="text-xs font-semibold text-indigo-600">Open text reader (Original · Both · Khmer)</button>
+            </div> : <div
               className="flex-1 overflow-y-auto px-5 py-6 space-y-6"
               style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
             >
@@ -1390,7 +1443,7 @@ export default function App() {
                   <p>ទំព័រទទេ / Page not found</p>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Bottom Floating Audio Player & Pagination Controller */}
             <div
