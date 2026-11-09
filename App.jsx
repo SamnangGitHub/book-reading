@@ -923,15 +923,15 @@ export default function App() {
                 {featuredBook.titleKhmer && <p lang="km" className="mt-1 text-lg font-medium text-white/90">{featuredBook.titleKhmer}</p>}
                 <p className="mt-1 text-sm text-white/70">{featuredBook.author || "Khmer Reader collection"}</p>
                 <span className="mt-3 rounded-full bg-white/15 px-3 py-1 text-xs text-white/85">{featuredBook.pages.some((page) => page.audioUrl) ? "◉  Ready to Read · Audio" : "◉  Ready to Read · Text"}</span>
-              </div> : isLoadingBooks ? <section aria-label="Loading books" aria-busy="true" className="relative z-10 flex flex-1 flex-col bg-slate-50 px-4 pb-24 pt-5 text-slate-600">
-                <h1 className="mb-1 text-lg font-semibold text-slate-800">{readerName ? `Welcome, ${readerName}` : "Welcome to Khmer Reader"}</h1>
-                <p className="mb-4 text-xs text-slate-500">Getting your books ready…</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {Array.from({ length: 2 }, (_, index) => <div key={index} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                    <div className="aspect-[3/4] bg-slate-200" />
-                    <div className="space-y-2 p-3"><div className="h-3 w-3/4 rounded bg-slate-200" /><div className="h-2.5 w-1/2 rounded bg-slate-100" /></div>
-                  </div>)}
+              </div> : isLoadingBooks ? <section aria-label="Loading books" aria-busy="true" className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center text-white">
+                <p className="mb-5 text-xs font-medium text-white/75">{readerName ? `Welcome, ${readerName}` : "Welcome to Khmer Reader"}</p>
+                <div className="flex h-[min(58vh,520px)] w-full max-w-[360px] items-center justify-center">
+                  <div className="h-[94%] w-[min(76vw,330px)] animate-pulse rounded-md bg-white/15 shadow-[0_24px_48px_rgba(0,0,0,.35)]" />
                 </div>
+                <div className="mt-5 h-1.5 w-14 animate-pulse rounded-full bg-white/45" />
+                <div className="mt-5 h-6 w-64 max-w-full animate-pulse rounded bg-white/20" />
+                <div className="mt-3 h-4 w-48 max-w-full animate-pulse rounded bg-white/15" />
+                <p className="mt-5 text-xs text-white/65">Getting your books ready…</p>
               </section> : <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center text-white/70"><p className="text-lg font-semibold text-white">{readerName ? `Welcome, ${readerName}` : "Welcome to Khmer Reader"}</p><p>{storageMessage ? "We couldn’t load your books. Please try again later." : "Your books will appear here"}</p></div>}
             </main>}
             {/* Header */}
