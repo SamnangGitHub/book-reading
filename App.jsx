@@ -879,6 +879,7 @@ export default function App() {
   });
   const featuredBooks = books.filter((book) => !book.isHidden && !book.isComingSoon);
   const featuredBook = featuredBooks.length ? featuredBooks[featuredIndex % featuredBooks.length] : null;
+  const readerName = readerUser?.name || readerUser?.displayName || readerUser?.username;
   const audioReadyBooks = books.filter((book) => !book.isHidden && !book.isComingSoon && book.pages.some((page) => page.audioUrl));
 
   return (
@@ -908,7 +909,7 @@ export default function App() {
             >
               <div className="absolute inset-0 bg-cover bg-center opacity-45 blur-[2px] scale-110" style={{ backgroundImage: featuredBook ? `url(${bookCoverImage(featuredBook)})` : "linear-gradient(135deg,#49351d,#131313)" }} />
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/95" />
-              <header className="relative z-10 flex items-center justify-between px-6 py-4"><span className="font-serif text-2xl italic">Khmer Reader</span><button onClick={() => setLibraryTab("search")} aria-label="Search books" className="rounded-full p-2"><Search /></button></header>
+              <header className="relative z-10 flex items-center justify-between px-6 py-4"><div><span className="block font-serif text-2xl italic">Khmer Reader</span><span className="mt-1 block text-sm font-medium text-white/85">{readerName ? `Welcome, ${readerName}` : "Browsing as guest"}</span></div><button onClick={() => setLibraryTab("search")} aria-label="Search books" className="rounded-full p-2"><Search /></button></header>
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[360px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
@@ -922,7 +923,16 @@ export default function App() {
                 {featuredBook.titleKhmer && <p lang="km" className="mt-1 text-lg font-medium text-white/90">{featuredBook.titleKhmer}</p>}
                 <p className="mt-1 text-sm text-white/70">{featuredBook.author || "Khmer Reader collection"}</p>
                 <span className="mt-3 rounded-full bg-white/15 px-3 py-1 text-xs text-white/85">{featuredBook.pages.some((page) => page.audioUrl) ? "◉  Ready to Read · Audio" : "◉  Ready to Read · Text"}</span>
-              </div> : <div className="relative z-10 flex flex-1 items-center justify-center text-white/70">{isLoadingBooks ? "Loading your books…" : "Your books will appear here"}</div>}
+              </div> : isLoadingBooks ? <section aria-label="Loading books" aria-busy="true" className="relative z-10 flex flex-1 flex-col bg-slate-50 px-4 pb-24 pt-5 text-slate-600">
+                <h1 className="mb-1 text-lg font-semibold text-slate-800">{readerName ? `Welcome, ${readerName}` : "Welcome to Khmer Reader"}</h1>
+                <p className="mb-4 text-xs text-slate-500">Getting your books ready…</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {Array.from({ length: 2 }, (_, index) => <div key={index} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <div className="aspect-[3/4] bg-slate-200" />
+                    <div className="space-y-2 p-3"><div className="h-3 w-3/4 rounded bg-slate-200" /><div className="h-2.5 w-1/2 rounded bg-slate-100" /></div>
+                  </div>)}
+                </div>
+              </section> : <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center text-white/70"><p className="text-lg font-semibold text-white">{readerName ? `Welcome, ${readerName}` : "Welcome to Khmer Reader"}</p><p>{storageMessage ? "We couldn’t load your books. Please try again later." : "Your books will appear here"}</p></div>}
             </main>}
             {/* Header */}
             <header className={`${libraryTab === "home" ? "hidden" : ""} sticky top-0 z-20 backdrop-blur-md px-4 sm:px-5 py-3 flex items-center justify-between border-b ${theme === "dark" ? "bg-zinc-950/95 border-zinc-800" : "bg-white/95 border-slate-200"}`}>
