@@ -907,7 +907,11 @@ export default function App() {
               {featuredBook ? <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-7 pb-20 text-center">
                 <div className="flex h-[min(58vh,520px)] w-full max-w-[340px] items-center justify-center">
                   {featuredBooks.length > 1 && <button aria-label="Previous book" onClick={() => setFeaturedIndex((featuredIndex - 1 + featuredBooks.length) % featuredBooks.length)} className="absolute left-1 rounded-full bg-white/10 p-2"><ChevronLeft /></button>}
-                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="h-full max-h-full overflow-hidden rounded-sm shadow-[0_25px_70px_rgba(0,0,0,.7)]"><img src={featuredBook.coverImage} alt={featuredBook.title} className="h-full w-auto max-w-[76vw] object-contain" /></button>
+                  <button onClick={() => openReader(featuredBook.id)} aria-label={`Open ${featuredBook.title}`} className="relative h-[94%] w-auto max-w-[76vw] aspect-[0.66] shrink overflow-visible rounded-r-sm bg-gradient-to-r from-[#72521b] via-[#c99c39] to-[#e0b84f] p-[3px] pl-[8px] shadow-[0_22px_50px_rgba(0,0,0,.65)]">
+                    <span aria-hidden="true" className="absolute -top-[5px] left-[10px] right-[4px] h-[6px] rounded-t-sm bg-gradient-to-b from-[#f2dda0] to-[#a77b2c] shadow-[0_-2px_3px_rgba(0,0,0,.35)]" />
+                    <span aria-hidden="true" className="absolute inset-y-[3px] left-[2px] w-[6px] rounded-l-sm bg-gradient-to-r from-[#49330f] via-[#b78a32] to-[#d9ad48] shadow-inner" />
+                    <img src={featuredBook.coverImage} alt={featuredBook.title} className="relative z-[1] h-full w-full rounded-r-[2px] object-cover shadow-[inset_3px_0_5px_rgba(0,0,0,.28)]" />
+                  </button>
                   {featuredBooks.length > 1 && <button aria-label="Next book" onClick={() => setFeaturedIndex((featuredIndex + 1) % featuredBooks.length)} className="absolute right-1 rounded-full bg-white/10 p-2"><ChevronRight /></button>}
                 </div>
                 <div className="mt-5 flex gap-1.5">{featuredBooks.slice(0, 9).map((book, index) => <button key={book.id} aria-label={`Show ${book.title}`} onClick={() => setFeaturedIndex(index)} className={`h-1.5 rounded-full ${index === featuredIndex % featuredBooks.length ? "w-5 bg-white" : "w-1.5 bg-white/40"}`} />)}</div>
