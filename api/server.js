@@ -96,11 +96,11 @@ function normalizeUsername(value) {
   return username;
 }
 
-async function googleStorageRequest(action, book, fileId, range) {
+async function googleStorageRequest(action, book, fileId, range, extra) {
   const response = await fetch(googleAppsScriptUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...(book ? { book } : {}), ...(fileId ? { fileId } : {}), ...(range ? { range } : {}) }),
+    body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...(book ? { book } : {}), ...(fileId ? { fileId } : {}), ...(range ? { range } : {}), ...(extra || {}) }),
     signal: AbortSignal.timeout(60000),
   });
   const result = await response.json().catch(() => null);
@@ -290,6 +290,27 @@ app.post("/api/admin/login", (req, res) => {
     return res.status(401).json({ error: "Incorrect admin password." });
   }
   res.json({ token: sign({ exp: Date.now() + 12 * 60 * 60 * 1000 }) });
+});
+
+app.post("/api/full-audio/upload", isAdmin, async (req, res, next) => {
+  try {
+    if (!googleAppsScriptUrl) return res.status(503).json({ error: "Large audiobook uploads require Google Drive storage." });
+    const result = await googleStorageRequest("beginFullAudioUpload", undefined, undefined, undefined, {
+      fileName: req.body?.fileName, size: req.body?.size, mimeType: req.body?.mimeType,
+    });
+    res.json({ uploadId: result.uploadId });
+  } catch (error) { next(error); }
+});
+
+app.post("/api/full-audio/upload/:uploadId/chunk", isAdmin, async (req, res, next) => {
+  try {
+    const uploadId = String(req.params.uploadId || "");
+    if (!/^[\w-]{20,}$/.test(uploadId)) return res.status(400).json({ error: "Invalid audiobook upload session." });
+    const result = await googleStorageRequest("uploadFullAudioChunk", undefined, undefined, undefined, {
+      uploadId, start: req.body?.start, end: req.body?.end, base64: req.body?.base64,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
 });
 
 app.put("/api/books/:id", isAdmin, async (req, res, next) => {
