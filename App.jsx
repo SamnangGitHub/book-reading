@@ -635,12 +635,8 @@ export default function App() {
     if (!file) return;
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (!["mp3", "wav", "m4a"].includes(extension)) { window.alert("Choose an MP3, WAV, or M4A audio file."); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const mime = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4" }[extension];
-      setNewBook((prev) => ({ ...prev, fullAudioUrl: String(reader.result).replace(/^data:[^;,]+;/, `data:${mime};`), fullAudioFileName: file.name }));
-    };
-    reader.readAsDataURL(file);
+    const previewUrl = URL.createObjectURL(file);
+    setNewBook((prev) => ({ ...prev, fullAudioUrl: previewUrl, fullAudioFile: file, fullAudioFileName: file.name }));
   };
 
   // Add Page in Creator (Appends at the end)
@@ -746,6 +742,7 @@ export default function App() {
             bookType: selectedBookType,
             isComingSoon: Boolean(newBook.isComingSoon),
             fullAudioUrl: newBook.fullAudioUrl,
+            fullAudioFile: newBook.fullAudioFile || null,
             fullAudioFileName: newBook.fullAudioFileName,
             coverImage:
               newBook.coverImage ||
@@ -785,6 +782,8 @@ export default function App() {
       try {
         const remoteBooks = await saveBookToApi(bookToPersist, adminToken || sessionStorage.getItem("khmer-reader-admin-token"));
         setBooks(remoteBooks);
+        const savedBook = remoteBooks.find((book) => book.id === bookToPersist.id);
+        if (savedBook) setNewBook((prev) => ({ ...prev, fullAudioUrl: savedBook.fullAudioUrl || "", fullAudioFile: null, fullAudioFileName: savedBook.fullAudioFileName || prev.fullAudioFileName }));
         setSaveStatus("Book saved successfully.");
       } catch (error) {
         setStorageMessage(`API save failed: ${error.message}`);
@@ -822,6 +821,7 @@ export default function App() {
       bookType: newBook.bookType === "Other" ? newBook.customBookType.trim() : newBook.bookType,
       coverImage: newBook.coverImage || savedBook.coverImage,
       fullAudioUrl: newBook.fullAudioUrl,
+      fullAudioFile: newBook.fullAudioFile || null,
       fullAudioFileName: newBook.fullAudioFileName,
       pages: savedBook.pages.some((page) => page.id === pageToSave.id)
         ? savedBook.pages.map((page) =>
@@ -844,6 +844,8 @@ export default function App() {
       const persistedBook = updatedBooks.find((book) => book.id === editingBookId) || updatedBook;
       setNewBook((prev) => ({
         ...prev,
+        fullAudioUrl: persistedBook.fullAudioUrl || prev.fullAudioUrl,
+        fullAudioFile: null,
         pages: prev.pages.map((page) =>
           page.id === pageToSave.id
             ? { ...(persistedBook.pages.find((savedPage) => savedPage.id === page.id) || page) }
@@ -1855,7 +1857,7 @@ export default function App() {
                 <label className="mb-2 block text-xs font-semibold">Full audiobook (one file for the whole book)</label>
                 <div className="flex items-center gap-2">
                   <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">{newBook.fullAudioFileName || "Choose MP3, WAV, or M4A"}<input type="file" accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4" className="hidden" onChange={(event) => handleFullAudioUpload(event.target.files?.[0])} /></label>
-                  {newBook.fullAudioUrl && <button type="button" onClick={() => setNewBook((prev) => ({ ...prev, fullAudioUrl: "", fullAudioFileName: "" }))} className="text-xs font-semibold text-rose-600">Remove</button>}
+                  {newBook.fullAudioUrl && <button type="button" onClick={() => setNewBook((prev) => ({ ...prev, fullAudioUrl: "", fullAudioFile: null, fullAudioFileName: "" }))} className="text-xs font-semibold text-rose-600">Remove</button>}
                 </div>
                 {newBook.fullAudioUrl && <audio controls preload="metadata" src={newBook.fullAudioUrl} className="mt-3 w-full" />}
                 <p className="mt-2 text-[10px] text-slate-500 dark:text-zinc-400">Readers can switch between this complete recording and the individual page tracks.</p>
