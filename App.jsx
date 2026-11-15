@@ -254,7 +254,7 @@ export default function App() {
   // Active Book Data
   const currentBook = books.find((b) => b.id === activeBookId) || books[0];
   const currentPage = currentBook?.pages[currentPageIndex] || null;
-  const fullAudioSource = downloadedFullAudio?.bookId === currentBook?.id ? downloadedFullAudio.url : "";
+  const fullAudioSource = downloadedFullAudio && downloadedFullAudio.bookId === currentBook?.id ? downloadedFullAudio.url : "";
 
   useEffect(() => () => {
     if (downloadedFullAudio?.url) URL.revokeObjectURL(downloadedFullAudio.url);
