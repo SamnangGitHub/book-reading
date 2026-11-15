@@ -76,6 +76,10 @@ async function ensureSchema() {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (username, book_id)
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS page_visits (
+    session_id TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
 }
 
 function normalizeReaderCredentials(body) {
@@ -170,6 +174,7 @@ async function listBooks() {
     const books = (await googleStorageRequest("list")).books;
     return books.map((book) => ({
       ...book,
+      fullAudioUrl: getDriveFileId(book.fullAudioUrl) ? `${publicApiUrl}/api/media/${encodeURIComponent(getDriveFileId(book.fullAudioUrl))}` : book.fullAudioUrl,
       pages: (book.pages || []).map((page) => {
         const fileId = getDriveFileId(page.audioUrl);
         return fileId ? { ...page, audioUrl: `${publicApiUrl}/api/media/${encodeURIComponent(fileId)}` } : page;
@@ -192,6 +197,21 @@ function getDriveFileId(value) {
 }
 
 app.get("/health", (_req, res) => res.json({ ok: true, storage: googleAppsScriptUrl ? "google" : "postgres" }));
+app.get("/api/visits", async (_req, res, next) => {
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*)::INTEGER AS visits FROM page_visits");
+    res.json({ visits: rows[0].visits });
+  } catch (error) { next(error); }
+});
+app.post("/api/visits", async (req, res, next) => {
+  try {
+    const sessionId = String(req.body?.sessionId || "");
+    if (!/^[\w-]{16,100}$/.test(sessionId)) return res.status(400).json({ error: "Invalid visit session." });
+    await pool.query("INSERT INTO page_visits (session_id) VALUES ($1) ON CONFLICT (session_id) DO NOTHING", [sessionId]);
+    const { rows } = await pool.query("SELECT COUNT(*)::INTEGER AS visits FROM page_visits");
+    res.json({ visits: rows[0].visits });
+  } catch (error) { next(error); }
+});
 app.get("/api/books", async (_req, res, next) => {
   try {
     res.json({ books: (await listBooks()).filter((book) => !book.isHidden) });
@@ -254,7 +274,7 @@ app.put("/api/books/:id", isAdmin, async (req, res, next) => {
     if (!book || String(book.id) !== req.params.id || !String(book.title || "").trim() || !String(book.bookType || "").trim()) {
       return res.status(400).json({ error: "A book with a matching ID, title, and book type is required." });
     }
-    if (!googleAppsScriptUrl && (book.pages || []).some((page) => String(page.audioUrl || "").startsWith("data:audio/"))) {
+    if (!googleAppsScriptUrl && (String(book.fullAudioUrl || "").startsWith("data:audio/") || (book.pages || []).some((page) => String(page.audioUrl || "").startsWith("data:audio/")))) {
       return res.status(503).json({ error: "Audio uploads require Google Drive storage. Configure GOOGLE_APPS_SCRIPT_URL and GOOGLE_APPS_SCRIPT_SECRET on the API service, then redeploy." });
     }
     if (googleAppsScriptUrl) await googleStorageRequest("save", book);
