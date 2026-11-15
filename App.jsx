@@ -228,6 +228,7 @@ export default function App() {
   const [audioQueueActive, setAudioQueueActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [audioMode, setAudioMode] = useState("pages");
   const audioRef = useRef(null);
   const autoAdvanceAudioRef = useRef(false);
 
@@ -273,6 +274,8 @@ export default function App() {
     customBookType: "",
     isComingSoon: false,
     coverImage: "",
+    fullAudioUrl: "",
+    fullAudioFileName: "",
     pages: [
       {
         id: "page-1",
@@ -302,7 +305,10 @@ export default function App() {
 
     const handleEnded = () => {
       setPlaybackProgress(0);
-      if (audioQueueActive) {
+      if (audioMode === "full") {
+        setIsPlaying(false);
+        setAudioQueueActive(false);
+      } else if (audioQueueActive) {
         const nextAudioIndex = currentBook?.pages.findIndex((page, index) => index > currentPageIndex && page.audioUrl) ?? -1;
         if (nextAudioIndex >= 0) {
           autoAdvanceAudioRef.current = true;
@@ -331,13 +337,13 @@ export default function App() {
   }, [currentPageIndex, currentBook, audioQueueActive]);
 
   useEffect(() => {
-    if (currentView !== "listen" || !isPlaying || autoAdvanceAudioRef.current || !currentPage?.audioUrl || !audioRef.current) return;
+    if (currentView !== "listen" || !isPlaying || autoAdvanceAudioRef.current || !(audioMode === "full" ? currentBook?.fullAudioUrl : currentPage?.audioUrl) || !audioRef.current) return;
     audioRef.current.play().catch((err) => {
       if (err.name === "AbortError") return;
       setAudioPlaybackError(`Audio could not play: ${err.message || "check the audio file access and format."}`);
       setIsPlaying(false);
     });
-  }, [currentPageIndex, currentView, currentPage?.audioUrl, isPlaying]);
+  }, [currentPageIndex, currentView, currentPage?.audioUrl, currentBook?.fullAudioUrl, audioMode, isPlaying]);
 
   // Handle Page Change Reset
   useEffect(() => {
@@ -369,7 +375,7 @@ export default function App() {
       return;
     }
 
-    if (!currentPage?.audioUrl || !audioRef.current) {
+    if (!(audioMode === "full" ? currentBook?.fullAudioUrl : currentPage?.audioUrl) || !audioRef.current) {
       setAudioPlaybackError("Audio is not available for this page yet.");
       return;
     }
@@ -425,6 +431,7 @@ export default function App() {
       const historyAudioIndex = book.pages.findIndex((page, index) => index >= historyIndex && page.audioUrl);
       const firstAudioIndex = book.pages.findIndex((page) => page.audioUrl);
       setActiveBookId(bookId);
+      setAudioMode("pages");
       setCurrentPageIndex(historyAudioIndex >= 0 ? historyAudioIndex : firstAudioIndex);
       setCurrentView("listen");
       setAudioQueueActive(false);
@@ -439,7 +446,7 @@ export default function App() {
       setShowAccountForm(true);
       return;
     }
-    if (!currentPage?.audioUrl) {
+    if (!(audioMode === "full" ? currentBook?.fullAudioUrl : currentPage?.audioUrl)) {
       setAudioPlaybackError("Choose a page with an audio track to start playback.");
       return;
     }
@@ -462,6 +469,8 @@ export default function App() {
       customBookType: book.bookType || "",
       isComingSoon: Boolean(book.isComingSoon),
       coverImage: book.coverImage || "",
+      fullAudioUrl: book.fullAudioUrl || "",
+      fullAudioFileName: book.fullAudioFileName || "",
       pages: book.pages.map((p) => ({ ...p }))
     });
     setCurrentView("create");
@@ -482,6 +491,8 @@ export default function App() {
       customBookType: "",
       isComingSoon: false,
       coverImage: "",
+      fullAudioUrl: "",
+      fullAudioFileName: "",
       pages: [
         {
           id: firstPageId,
@@ -620,6 +631,18 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
+  const handleFullAudioUpload = (file) => {
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!["mp3", "wav", "m4a"].includes(extension)) { window.alert("Choose an MP3, WAV, or M4A audio file."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const mime = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4" }[extension];
+      setNewBook((prev) => ({ ...prev, fullAudioUrl: String(reader.result).replace(/^data:[^;,]+;/, `data:${mime};`), fullAudioFileName: file.name }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Add Page in Creator (Appends at the end)
   const addNewPageToForm = () => {
     const id = `page-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -722,6 +745,8 @@ export default function App() {
             author: newBook.author,
             bookType: selectedBookType,
             isComingSoon: Boolean(newBook.isComingSoon),
+            fullAudioUrl: newBook.fullAudioUrl,
+            fullAudioFileName: newBook.fullAudioFileName,
             coverImage:
               newBook.coverImage ||
               "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=600&q=80",
@@ -796,6 +821,8 @@ export default function App() {
       author: newBook.author,
       bookType: newBook.bookType === "Other" ? newBook.customBookType.trim() : newBook.bookType,
       coverImage: newBook.coverImage || savedBook.coverImage,
+      fullAudioUrl: newBook.fullAudioUrl,
+      fullAudioFileName: newBook.fullAudioFileName,
       pages: savedBook.pages.some((page) => page.id === pageToSave.id)
         ? savedBook.pages.map((page) =>
             page.id === pageToSave.id ? { ...pageToSave, pageNumber: page.pageNumber } : page
@@ -1299,10 +1326,10 @@ export default function App() {
         {(currentView === "reader" || currentView === "listen") && (
           <div className="flex-1 flex flex-col h-[calc(100dvh-58px)]">
             {/* Hidden Audio Element */}
-            {currentPage?.audioUrl && (
+            {(audioMode === "full" ? currentBook?.fullAudioUrl : currentPage?.audioUrl) && (
               <audio
                 ref={audioRef}
-                src={currentPage.audioUrl}
+                src={audioMode === "full" ? currentBook.fullAudioUrl : currentPage.audioUrl}
                 preload="metadata"
                 muted={isMuted}
                 onCanPlay={() => {
@@ -1321,10 +1348,10 @@ export default function App() {
                 onError={() => {
                   autoAdvanceAudioRef.current = false;
                   setIsPlaying(false);
-                  const isRawAac = currentPage.audioFileName?.toLowerCase().endsWith(".aac");
+                    const isRawAac = (audioMode === "full" ? currentBook.fullAudioFileName : currentPage.audioFileName)?.toLowerCase().endsWith(".aac");
                   setAudioPlaybackError(isRawAac
                     ? "This is raw .aac audio, which Chrome cannot play directly. Upload its matching .wav file or convert it to .m4a (AAC in MP4), then save the page."
-                    : `Could not play ${currentPage.audioFileName || "this audio file"}. For the most reliable playback, upload an MP3 file in the editor and click Save Page. Also check that the Drive file is accessible.`);
+                    : `Could not play ${(audioMode === "full" ? currentBook.fullAudioFileName : currentPage.audioFileName) || "this audio file"}. For the most reliable playback, upload an MP3 file in the editor and save. Also check that the Drive file is accessible.`);
                 }}
               />
             )}
@@ -1427,7 +1454,8 @@ export default function App() {
             {currentView === "listen" ? <div className={`flex-1 flex flex-col items-center justify-center gap-4 px-7 text-center ${currentTheme.card}`}>
               <img src={bookCoverImage(currentBook || {})} alt={`${currentBook?.title} cover`} className="h-[min(42vh,360px)] max-w-[75vw] rounded-lg object-contain shadow-2xl" />
               <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-indigo-500">Audiobook</p><h2 className="mt-1 text-lg font-bold">{currentBook?.title}</h2><p className="text-xs opacity-70">{currentBook?.author}</p></div>
-              <label className="flex w-full max-w-xs flex-col gap-1 text-left text-xs font-semibold">
+              {currentBook?.fullAudioUrl && <div className="flex rounded-xl bg-slate-200 p-1 text-xs font-semibold dark:bg-zinc-800"><button onClick={() => { setAudioMode("pages"); setIsPlaying(false); }} className={`flex-1 rounded-lg px-3 py-2 ${audioMode === "pages" ? "bg-white text-slate-900 shadow dark:bg-zinc-700 dark:text-white" : "text-slate-600 dark:text-zinc-300"}`}>Page by page</button><button onClick={() => { setAudioMode("full"); setIsPlaying(false); }} className={`flex-1 rounded-lg px-3 py-2 ${audioMode === "full" ? "bg-white text-slate-900 shadow dark:bg-zinc-700 dark:text-white" : "text-slate-600 dark:text-zinc-300"}`}>Full audiobook</button></div>}
+              {audioMode === "pages" && <label className="flex w-full max-w-xs flex-col gap-1 text-left text-xs font-semibold">
                 Start from page
                 <select
                   value={currentPage?.audioUrl ? currentPageIndex : ""}
@@ -1436,15 +1464,15 @@ export default function App() {
                     setIsPlaying(false);
                     setCurrentPageIndex(Number(event.target.value));
                   }}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                 >
                   {(currentBook?.pages || []).map((page, index) => page.audioUrl ? (
                     <option key={page.id || index} value={index}>Page {index + 1}{readingProgress[currentBook.id] === index ? " · Listening history" : ""}</option>
                   ) : null)}
                 </select>
-              </label>
-              <p className="text-xs opacity-70">Page {currentPageIndex + 1} of {currentBook?.pages.length} · Track {(currentBook?.pages.slice(0, currentPageIndex + 1).filter((page) => page.audioUrl).length || 1)} of {currentBook?.pages.filter((page) => page.audioUrl).length}</p>
-              <button onClick={startAudioBook} disabled={isPlaying} className="rounded-full bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-60">{isPlaying ? "Playing audiobook…" : "Play audiobook from selected page"}</button>
+              </label>}
+              <p className="text-xs opacity-70">{audioMode === "full" ? "Single full-book recording" : <>Page {currentPageIndex + 1} of {currentBook?.pages.length} · Track {(currentBook?.pages.slice(0, currentPageIndex + 1).filter((page) => page.audioUrl).length || 1)} of {currentBook?.pages.filter((page) => page.audioUrl).length}</>}</p>
+              <button onClick={startAudioBook} disabled={isPlaying} className="rounded-full bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-60">{isPlaying ? "Playing audiobook…" : audioMode === "full" ? "Play full audiobook" : "Play audiobook from selected page"}</button>
               <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="text-xs font-semibold text-indigo-600">Open text reader (Original · Both · Khmer)</button>
             </div> : <div
               className="flex-1 overflow-y-auto px-5 py-6 space-y-6"
@@ -1823,6 +1851,16 @@ export default function App() {
                 <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-900"><input type="checkbox" checked={Boolean(newBook.isComingSoon)} onChange={(event) => setNewBook((prev) => ({ ...prev, isComingSoon: event.target.checked }))} className="h-4 w-4 accent-amber-600" />Show this book to readers as Coming soon</label>
               </div>
 
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <label className="mb-2 block text-xs font-semibold">Full audiobook (one file for the whole book)</label>
+                <div className="flex items-center gap-2">
+                  <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">{newBook.fullAudioFileName || "Choose MP3, WAV, or M4A"}<input type="file" accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4" className="hidden" onChange={(event) => handleFullAudioUpload(event.target.files?.[0])} /></label>
+                  {newBook.fullAudioUrl && <button type="button" onClick={() => setNewBook((prev) => ({ ...prev, fullAudioUrl: "", fullAudioFileName: "" }))} className="text-xs font-semibold text-rose-600">Remove</button>}
+                </div>
+                {newBook.fullAudioUrl && <audio controls preload="metadata" src={newBook.fullAudioUrl} className="mt-3 w-full" />}
+                <p className="mt-2 text-[10px] text-slate-500 dark:text-zinc-400">Readers can switch between this complete recording and the individual page tracks.</p>
+              </div>
+
               {/* SECTION: Page By Page Content */}
               <div className="space-y-4">
                 {!editingBookId && (
@@ -1842,8 +1880,8 @@ export default function App() {
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                    មាតិកាតាមទំព័រ (Pages: {newBook.pages.length})
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  មាតិកាតាមទំព័រ (Pages: {newBook.pages.length})
                   </h3>
                   <button
                     type="button"
