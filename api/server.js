@@ -258,7 +258,7 @@ app.get("/api/full-audio/:fileId/download", async (req, res, next) => {
     res.end();
   } catch (error) {
     if (res.headersSent) res.destroy(error);
-    else next(error);
+    else res.status(502).json({ error: `Audiobook download failed: ${error.message || "storage request error."}` });
   }
 });
 
