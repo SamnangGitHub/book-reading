@@ -277,7 +277,11 @@ export default function App() {
         ? `${proxyMatch[1] || ""}/api/full-audio/${encodeURIComponent(fileId)}/download`
         : source;
       const response = await fetch(downloadUrl);
-      if (!response.ok || !response.body) throw new Error(`Download failed (${response.status}).`);
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        throw new Error(failure.error || `Download failed (${response.status}).`);
+      }
+      if (!response.body) throw new Error("This browser cannot stream the audiobook download.");
       const total = Number(response.headers.get("content-length")) || 0;
       const reader = response.body.getReader();
       const chunks = [];
