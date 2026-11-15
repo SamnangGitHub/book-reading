@@ -223,6 +223,45 @@ app.get("/api/admin/books", isAdmin, async (_req, res, next) => {
   catch (error) { next(error); }
 });
 
+app.get("/api/full-audio/:fileId/download", async (req, res, next) => {
+  try {
+    const fileId = String(req.params.fileId || "");
+    if (!/^[\w-]{20,}$/.test(fileId)) return res.status(400).json({ error: "Invalid media file ID." });
+    const chunkSize = 4 * 1024 * 1024;
+    let start = 0;
+    let total = 0;
+    let first = true;
+    while (!total || start < total) {
+      const result = await googleStorageRequest("mediaRange", undefined, fileId, {
+        header: `bytes=${start}-${start + chunkSize - 1}`, chunkSize,
+      });
+      const buffer = Buffer.from(result.base64 || "", "base64");
+      const responseStart = Number(result.start);
+      total = Number(result.size);
+      if (!buffer.length || !Number.isSafeInteger(total) || responseStart !== start || start + buffer.length > total) {
+        throw new Error("Drive returned an invalid audiobook download chunk.");
+      }
+      if (first) {
+        const extension = String(result.fileName || "audiobook.mp3").split(".").pop().toLowerCase();
+        const mimeType = ({ mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac" })[extension] || "application/octet-stream";
+        res.status(200)
+          .set("Content-Type", mimeType)
+          .set("Content-Length", total)
+          .set("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(result.fileName || "audiobook")}`)
+          .set("Cache-Control", "private, no-store")
+          .set("X-Content-Type-Options", "nosniff");
+        first = false;
+      }
+      if (!res.write(buffer)) await new Promise((resolve) => res.once("drain", resolve));
+      start += buffer.length;
+    }
+    res.end();
+  } catch (error) {
+    if (res.headersSent) res.destroy(error);
+    else next(error);
+  }
+});
+
 app.get("/api/full-audio/:fileId", async (req, res, next) => {
   try {
     const fileId = String(req.params.fileId || "");
