@@ -96,11 +96,11 @@ function normalizeUsername(value) {
   return username;
 }
 
-async function googleStorageRequest(action, book, fileId) {
+async function googleStorageRequest(action, book, fileId, range) {
   const response = await fetch(googleAppsScriptUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...(book ? { book } : {}), ...(fileId ? { fileId } : {}) }),
+    body: JSON.stringify({ action, secret: googleAppsScriptSecret, ...(book ? { book } : {}), ...(fileId ? { fileId } : {}), ...(range ? { range } : {}) }),
     signal: AbortSignal.timeout(60000),
   });
   const result = await response.json().catch(() => null);
@@ -174,7 +174,7 @@ async function listBooks() {
     const books = (await googleStorageRequest("list")).books;
     return books.map((book) => ({
       ...book,
-      fullAudioUrl: getDriveFileId(book.fullAudioUrl) ? `${publicApiUrl}/api/media/${encodeURIComponent(getDriveFileId(book.fullAudioUrl))}` : book.fullAudioUrl,
+      fullAudioUrl: getDriveFileId(book.fullAudioUrl) ? `${publicApiUrl}/api/full-audio/${encodeURIComponent(getDriveFileId(book.fullAudioUrl))}` : book.fullAudioUrl,
       pages: (book.pages || []).map((page) => {
         const fileId = getDriveFileId(page.audioUrl);
         return fileId ? { ...page, audioUrl: `${publicApiUrl}/api/media/${encodeURIComponent(fileId)}` } : page;
@@ -191,7 +191,7 @@ function getDriveFileId(value) {
   const pathId = url.match(/\/d\/([^/?]+)/)?.[1];
   // Playback URLs are proxied through this API so the browser gets byte-range
   // support. Keep recognizing that proxy URL when an edited book is saved.
-  const proxyId = url.match(/\/api\/media\/([\w-]{20,})(?:[?#]|$)/)?.[1];
+  const proxyId = url.match(/\/api\/(?:media|full-audio)\/([\w-]{20,})(?:[?#]|$)/)?.[1];
   const id = queryId || pathId || proxyId || "";
   try { return decodeURIComponent(id); } catch { return ""; }
 }
@@ -223,6 +223,37 @@ app.get("/api/admin/books", isAdmin, async (_req, res, next) => {
   catch (error) { next(error); }
 });
 
+app.get("/api/full-audio/:fileId", async (req, res, next) => {
+  try {
+    const fileId = String(req.params.fileId || "");
+    if (!/^[\w-]{20,}$/.test(fileId)) return res.status(400).json({ error: "Invalid media file ID." });
+    // Large audiobooks must be fetched from Drive in bounded byte ranges. Apps
+    // Script's JSON response cannot safely carry the complete recording.
+    const chunkSize = 4 * 1024 * 1024;
+    const result = await googleStorageRequest("mediaRange", undefined, fileId, { header: req.get("range") || "", chunkSize });
+    const extension = String(result.fileName || "").split(".").pop().toLowerCase();
+    const mimeByExtension = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac" };
+    const reportedMime = String(result.mimeType || "").toLowerCase();
+    const mimeType = mimeByExtension[extension] || (reportedMime.startsWith("audio/") ? reportedMime : "application/octet-stream");
+    if (!mimeType.startsWith("audio/")) return res.status(415).json({ error: "The Drive file is not a recognized audio file. Use MP3, WAV, or M4A." });
+    const buffer = Buffer.from(result.base64 || "", "base64");
+    const total = Number(result.size);
+    const start = Number(result.start);
+    const end = start + buffer.length - 1;
+    if (!Number.isSafeInteger(total) || !Number.isSafeInteger(start) || !buffer.length || end >= total) {
+      return res.status(502).json({ error: "Drive returned an invalid audio byte range." });
+    }
+    res.status(206)
+      .set("Content-Type", mimeType)
+      .set("Accept-Ranges", "bytes")
+      .set("Cache-Control", "public, max-age=300")
+      .set("Content-Range", `bytes ${start}-${end}/${total}`)
+      .set("Content-Length", buffer.length)
+      .send(buffer);
+  } catch (error) { next(error); }
+});
+
+// Page-by-page audio keeps the existing whole-file proxy behavior.
 app.get("/api/media/:fileId", async (req, res, next) => {
   try {
     const fileId = String(req.params.fileId || "");
@@ -233,15 +264,11 @@ app.get("/api/media/:fileId", async (req, res, next) => {
       const extension = String(result.fileName || "").split(".").pop().toLowerCase();
       const mimeByExtension = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac" };
       const reportedMime = String(result.mimeType || "").toLowerCase();
-      media = {
-        buffer: Buffer.from(result.base64, "base64"),
-        mimeType: mimeByExtension[extension] || (reportedMime.startsWith("audio/") ? reportedMime : "application/octet-stream"),
-      };
-      if (!media.mimeType.startsWith("audio/")) return res.status(415).json({ error: "The Drive file is not a recognized audio file. Use MP3, WAV, or M4A." });
+      media = { buffer: Buffer.from(result.base64, "base64"), mimeType: mimeByExtension[extension] || (reportedMime.startsWith("audio/") ? reportedMime : "application/octet-stream") };
+      if (!media.mimeType.startsWith("audio/")) return res.status(415).json({ error: "The Drive file is not a recognized audio file." });
       if (mediaCache.size >= 8) mediaCache.delete(mediaCache.keys().next().value);
       mediaCache.set(fileId, media);
     }
-
     const { buffer, mimeType } = media;
     res.set("Content-Type", mimeType).set("Accept-Ranges", "bytes").set("Cache-Control", "public, max-age=300");
     const range = req.get("range");
@@ -251,10 +278,7 @@ app.get("/api/media/:fileId", async (req, res, next) => {
     const start = match[1] ? Number(match[1]) : Math.max(0, buffer.length - Number(match[2]));
     const end = match[2] ? Math.min(Number(match[2]), buffer.length - 1) : buffer.length - 1;
     if (start >= buffer.length || start > end) return res.status(416).set("Content-Range", `bytes */${buffer.length}`).end();
-    res.status(206)
-      .set("Content-Range", `bytes ${start}-${end}/${buffer.length}`)
-      .set("Content-Length", end - start + 1)
-      .send(buffer.subarray(start, end + 1));
+    res.status(206).set("Content-Range", `bytes ${start}-${end}/${buffer.length}`).set("Content-Length", end - start + 1).send(buffer.subarray(start, end + 1));
   } catch (error) { next(error); }
 });
 
