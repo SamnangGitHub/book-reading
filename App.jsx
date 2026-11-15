@@ -1500,7 +1500,7 @@ export default function App() {
             </div>}
 
             {/* Page Reading Canvas */}
-            {currentView === "listen" ? <div className={`flex-1 flex flex-col items-center justify-center gap-4 px-7 text-center ${currentTheme.card}`}>
+            {currentView === "listen" ? <div className={`min-h-0 flex-1 overflow-y-auto flex flex-col items-center justify-start gap-4 px-7 py-6 text-center ${currentTheme.card}`}>
               <img src={bookCoverImage(currentBook || {})} alt={`${currentBook?.title} cover`} className="h-[min(42vh,360px)] max-w-[75vw] rounded-lg object-contain shadow-2xl" />
               <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-indigo-500">Audiobook</p><h2 className="mt-1 text-lg font-bold">{currentBook?.title}</h2><p className="text-xs opacity-70">{currentBook?.author}</p></div>
               {currentBook?.fullAudioUrl && <div className="flex rounded-xl bg-slate-200 p-1 text-xs font-semibold dark:bg-zinc-800"><button onClick={() => { setAudioMode("pages"); setIsPlaying(false); }} className={`flex-1 rounded-lg px-3 py-2 ${audioMode === "pages" ? "bg-white text-slate-900 shadow dark:bg-zinc-700 dark:text-white" : "text-slate-600 dark:text-zinc-300"}`}>Page by page</button><button onClick={() => { setAudioMode("full"); setIsPlaying(false); }} className={`flex-1 rounded-lg px-3 py-2 ${audioMode === "full" ? "bg-white text-slate-900 shadow dark:bg-zinc-700 dark:text-white" : "text-slate-600 dark:text-zinc-300"}`}>Full audiobook</button></div>}
