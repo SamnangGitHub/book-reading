@@ -41,9 +41,9 @@ Audio uploads require both Google storage environment variables on the API servi
 1. Sign in to the Google account that should own the library and media.
 2. Open [script.google.com](https://script.google.com) and create a **New project**.
 3. Copy the contents of this repository's `google-apps-script/Code.gs` into `Code.gs`, replacing the starter function. The script must include the `doPost` secret check; older versions that allow unauthenticated saves must not be used.
-4. Save the project with a recognizable name, such as **Khmer Reader Storage**.
-5. In the function selector, choose `setup` and click **Run**.
-6. Review the requested Google Sheets and Drive permissions and authorize them.
+4. In **Project Settings**, enable **Show `appsscript.json` manifest file in editor**. Copy this repository's `google-apps-script/appsscript.json` into the Apps Script manifest and save. It declares the external request scope required to fetch audiobook bytes from Google Drive, along with the Drive and Sheets scopes used by the storage script.
+5. Save the project with a recognizable name, such as **Khmer Reader Storage**.
+6. In the function selector, choose `setup` and click **Run**. Review the updated Google Sheets, Drive, and external request permissions and authorize them. If Apps Script does not show the new external request permission, save and refresh the editor, then run `setup` again.
 7. In **Execution log**, open the logged spreadsheet and Drive folder links. Confirm that `Books` and `Pages` exist with the headers above, and that the folder is named **Khmer Reader Media**.
 
 `setup()` stores the spreadsheet and folder IDs in Apps Script project properties. Run it only once for a new project. If you intentionally create a different spreadsheet or folder, update the corresponding `SPREADSHEET_ID` or `DRIVE_FOLDER_ID` in **Project Settings → Script properties**.
@@ -56,7 +56,7 @@ Audio uploads require both Google storage environment variables on the API servi
 
 ## Deploy the Apps Script web app
 
-1. Click **Deploy → New deployment**.
+1. Click **Deploy → New deployment** for the initial release. For an existing deployment after changing code or OAuth scopes, choose **Manage deployments**, edit the deployment, select **New version**, then deploy so the live `/exec` URL uses the updated authorization.
 2. Select the gear icon and choose **Web app**.
 3. Set **Execute as** to **Me**, so the script can write to the Sheet and Drive folder you created.
 4. Set **Who has access** to **Anyone** (or the equivalent public access option), because Render's server calls the web app without a Google user session. Writes and reads are guarded by `INTEGRATION_SECRET`; do not deploy an older unauthenticated version of `Code.gs`.
