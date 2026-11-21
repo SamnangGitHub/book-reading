@@ -230,6 +230,7 @@ export default function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef(null);
   const autoAdvanceAudioRef = useRef(false);
+  const nextAudioPreloadRef = useRef(null);
 
   useEffect(() => {
     if (!apiConfigured) return;
@@ -250,6 +251,36 @@ export default function App() {
   // Active Book Data
   const currentBook = books.find((b) => b.id === activeBookId) || books[0];
   const currentPage = currentBook?.pages[currentPageIndex] || null;
+
+  // Start fetching the next narration while the current page is playing.
+  // The audio element is recreated for each page, so warming the browser cache
+  // here avoids waiting for a fresh network request after the ended event.
+  useEffect(() => {
+    const nextAudioIndex = currentBook?.pages.findIndex(
+      (page, index) => index > currentPageIndex && page.audioUrl
+    ) ?? -1;
+    const nextAudioUrl = nextAudioIndex >= 0 ? currentBook.pages[nextAudioIndex].audioUrl : "";
+    const previousPreload = nextAudioPreloadRef.current;
+    if (previousPreload) {
+      previousPreload.pause();
+      previousPreload.removeAttribute("src");
+      previousPreload.load();
+      nextAudioPreloadRef.current = null;
+    }
+    if (!nextAudioUrl) return;
+
+    const preload = new Audio();
+    preload.preload = "auto";
+    preload.src = nextAudioUrl;
+    preload.load();
+    nextAudioPreloadRef.current = preload;
+    return () => {
+      preload.pause();
+      preload.removeAttribute("src");
+      preload.load();
+      if (nextAudioPreloadRef.current === preload) nextAudioPreloadRef.current = null;
+    };
+  }, [currentBook, currentPageIndex]);
 
   useEffect(() => {
     if (!readerUser || !currentBook?.id || !["reader", "listen"].includes(currentView)) return;
@@ -1305,7 +1336,7 @@ export default function App() {
               <audio
                 ref={audioRef}
                 src={currentPage.audioUrl}
-                preload="metadata"
+                preload="auto"
                 muted={isMuted}
                 onCanPlay={() => {
                   if (!autoAdvanceAudioRef.current || !audioRef.current) return;
