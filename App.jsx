@@ -429,6 +429,11 @@ export default function App() {
     setPlaybackProgress(newPercent);
   };
 
+  const formatAudioTime = (seconds) => {
+    const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+    return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, "0")}`;
+  };
+
   const changeSpeed = () => {
     const speeds = [0.8, 1.0, 1.25, 1.5];
     const nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
@@ -1382,7 +1387,9 @@ export default function App() {
               </button>
 
               {/* Title & Page Counter */}
-              <div className="text-center px-2 flex-1">
+              {currentView === "listen" ? <div className="min-w-0 flex-1 px-2 text-left text-[11px] font-medium text-slate-500">
+                <span>Library</span><span className="mx-1.5">/</span><span className="truncate font-semibold text-slate-800 dark:text-zinc-100">{currentBook?.titleKhmer || currentBook?.title}</span>
+              </div> : <div className="text-center px-2 flex-1">
                 <h2 className="text-xs font-semibold uppercase tracking-wider line-clamp-1 opacity-75">
                   {currentBook?.title}
                 </h2>
@@ -1392,11 +1399,11 @@ export default function App() {
                   <span className="text-slate-500">/ {currentBook?.pages.length}</span>
                   <button type="submit" className="rounded bg-indigo-50 px-1.5 py-0.5 font-semibold text-indigo-600">Go</button>
                 </form>
-              </div>
+              </div>}
 
               {/* Action Buttons: Edit Book & Reader Settings */}
               <div className="flex items-center space-x-1">
-                {currentView === "listen" && <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="rounded-full bg-indigo-600 px-2.5 py-1.5 text-[10px] font-semibold text-white">Read text</button>}
+                {currentView === "listen" && <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-indigo-300"><BookOpen className="mr-1 inline h-3 w-3" />Read Text</button>}
                 <button onClick={() => window.location.reload()} aria-label="Refresh app" title="Refresh app" className="p-2 rounded-full hover:bg-black/5 active:scale-95 transition"><RotateCcw className="w-4 h-4" /></button>
                 <button
                   onClick={() => {
@@ -1457,28 +1464,32 @@ export default function App() {
             </div>}
 
             {/* Page Reading Canvas */}
-            {currentView === "listen" ? <div className={`min-h-0 flex-1 overflow-y-auto flex flex-col items-center justify-start gap-4 px-7 py-6 text-center ${currentTheme.card}`}>
-              <img src={bookCoverImage(currentBook || {})} alt={`${currentBook?.title} cover`} className="h-[min(42vh,360px)] max-w-[75vw] rounded-lg object-contain shadow-2xl" />
-              <div><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-indigo-500">Audiobook</p><h2 className="mt-1 text-lg font-bold">{currentBook?.title}</h2><p className="text-xs opacity-70">{currentBook?.author}</p></div>
-              <label className="flex w-full max-w-xs flex-col gap-1 text-left text-xs font-semibold">
-                Start from page
-                <select
-                  value={currentPage?.audioUrl ? currentPageIndex : ""}
-                  onChange={(event) => {
-                    setAudioQueueActive(false);
-                    setIsPlaying(false);
-                    setCurrentPageIndex(Number(event.target.value));
-                  }}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                >
-                  {(currentBook?.pages || []).map((page, index) => page.audioUrl ? (
-                    <option key={page.id || index} value={index}>Page {index + 1}{readingProgress[currentBook.id] === index ? " · Listening history" : ""}</option>
-                  ) : null)}
-                </select>
-              </label>
-              <p className="text-xs opacity-70">Page {currentPageIndex + 1} of {currentBook?.pages.length} · Track {(currentBook?.pages.slice(0, currentPageIndex + 1).filter((page) => page.audioUrl).length || 1)} of {currentBook?.pages.filter((page) => page.audioUrl).length}</p>
-              <button onClick={startAudioBook} disabled={isPlaying} className="rounded-full bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-60">{isPlaying ? "Playing audiobook…" : "Play audiobook from selected page"}</button>
-              <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="text-xs font-semibold text-indigo-600">Open text reader (Original · Both · Khmer)</button>
+            {currentView === "listen" ? <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5 sm:py-6 ${theme === "dark" ? "bg-zinc-950" : "bg-slate-50"}`}>
+              <section aria-label="Audiobook player" className={`mx-auto flex min-h-full w-full max-w-3xl flex-col items-center rounded-2xl border px-5 py-6 text-center shadow-sm sm:px-8 sm:py-8 ${currentTheme.card} ${currentTheme.border}`}>
+                <img src={bookCoverImage(currentBook || {})} alt={`${currentBook?.titleKhmer || currentBook?.title} cover`} className="h-[min(34vh,300px)] max-w-[70vw] rounded-xl object-contain shadow-[0_16px_28px_rgba(15,23,42,.18)]" />
+                <span className="mt-4 rounded-full bg-indigo-50 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">● Audiobook · Page sync</span>
+                <h1 lang={currentBook?.titleKhmer ? "km" : undefined} className="mt-2 max-w-xl text-xl font-extrabold leading-snug text-slate-900 dark:text-zinc-100 sm:text-2xl" style={currentBook?.titleKhmer ? { fontFamily: "'Kantumruy Pro', 'Battambang', sans-serif" } : undefined}>{currentBook?.titleKhmer || currentBook?.title}</h1>
+                {currentBook?.titleKhmer && <p className="mt-1 max-w-xl text-sm font-medium text-slate-500 dark:text-zinc-400">{currentBook.title}</p>}
+                {currentBook?.author && <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">{currentBook.author}</p>}
+                <label className="mt-4 flex w-full max-w-md flex-col rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left dark:border-zinc-700 dark:bg-zinc-800/70">
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Selected track</span>
+                  <select aria-label="Choose audiobook track" value={currentPage?.audioUrl ? currentPageIndex : ""} onChange={(event) => { setAudioQueueActive(false); setIsPlaying(false); setCurrentPageIndex(Number(event.target.value)); }} className="mt-0.5 w-full truncate bg-transparent text-xs font-semibold text-slate-800 outline-none dark:text-zinc-100">
+                    {(currentBook?.pages || []).map((page, index) => page.audioUrl ? <option key={page.id || index} value={index}>Page {index + 1}{page.audioFileName ? ` · ${page.audioFileName.replace(/\.[^.]+$/, "")}` : ""}{readingProgress[currentBook.id] === index ? " · Last listened" : ""}</option> : null)}
+                  </select>
+                </label>
+                <div className="mt-auto w-full max-w-md pt-6">
+                  <input aria-label="Seek audio" type="range" min="0" max="100" value={playbackProgress} onChange={handleSeek} className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-indigo-600 dark:bg-zinc-700" />
+                  <div className="mt-1 flex justify-between text-[10px] text-slate-500"><span>{formatAudioTime(audioDuration * playbackProgress / 100)}</span><span>-{formatAudioTime(audioDuration * (1 - playbackProgress / 100))}</span></div>
+                  <div className="mt-4 flex items-center justify-center gap-3 sm:gap-5">
+                    <button onClick={changeSpeed} className="rounded-lg bg-slate-100 px-2.5 py-2 text-[10px] font-bold text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">{playbackSpeed}x</button>
+                    <button aria-label="Back 15 seconds" onClick={() => { if (audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 15); }} className="rounded-lg p-2 text-slate-600 dark:text-zinc-300"><span className="text-[10px]">−15s</span></button>
+                    <button aria-label={isPlaying ? "Pause audiobook" : "Play audiobook"} onClick={() => { if (isPlaying) { audioRef.current?.pause(); setIsPlaying(false); } else startAudioBook(); }} disabled={!currentPage?.audioUrl} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 disabled:opacity-50">{isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}</button>
+                    <button aria-label="Forward 15 seconds" onClick={() => { if (audioRef.current) audioRef.current.currentTime = Math.min(audioDuration, audioRef.current.currentTime + 15); }} className="rounded-lg p-2 text-slate-600 dark:text-zinc-300"><span className="text-[10px]">+15s</span></button>
+                    <button aria-label={isMuted ? "Unmute" : "Mute"} onClick={() => setIsMuted((muted) => !muted)} className="rounded-lg bg-slate-100 p-2 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">{isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
+                  </div>
+                  {audioPlaybackError && <p role="status" className="mt-3 text-[10px] text-rose-600">{audioPlaybackError}</p>}
+                </div>
+              </section>
             </div> : <div
               className="flex-1 overflow-y-auto px-5 py-6 space-y-6"
               style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
@@ -1546,7 +1557,7 @@ export default function App() {
             </div>}
 
             {/* Bottom Floating Audio Player & Pagination Controller */}
-            <div
+            {currentView !== "listen" && <div
               className={`p-3.5 border-t shadow-lg ${currentTheme.card} ${currentTheme.border} rounded-t-2xl flex flex-col space-y-2`}
             >
               {/* Progress Bar (Scrubber) */}
@@ -1634,7 +1645,7 @@ export default function App() {
                   ? `🎙️ ${currentPage.audioFileName || "Page voice track ready"}`
                   : "🎙️ Audio is not available for this page yet."}
               </div>
-            </div>
+            </div>}
 
             {/* Reading Customization Bottom Sheet / Modal */}
             {showSettingsModal && (
@@ -1854,7 +1865,7 @@ export default function App() {
                   <p className="mt-1 text-[10px] text-slate-500">Separate multiple types with /, comma, or semicolon. Each becomes a filter and label.</p>
                 </div>
                 <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-900"><input type="checkbox" checked={Boolean(newBook.isComingSoon)} onChange={(event) => setNewBook((prev) => ({ ...prev, isComingSoon: event.target.checked }))} className="h-4 w-4 accent-amber-600" />Show this book to readers as Coming soon</label>
-              </div>
+              </div>}
 
               {/* SECTION: Page By Page Content */}
               <div className="space-y-4">
