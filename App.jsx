@@ -1388,7 +1388,7 @@ export default function App() {
 
               {/* Title & Page Counter */}
               {currentView === "listen" ? <div className="min-w-0 flex-1 px-2 text-left text-[11px] font-medium text-slate-500">
-                <span>Library</span><span className="mx-1.5">/</span><span className="truncate font-semibold text-slate-800 dark:text-zinc-100">{currentBook?.titleKhmer || currentBook?.title}</span>
+                <span>Library</span><span className="mx-1.5">/</span><span className="truncate font-semibold text-slate-800 dark:text-zinc-100">{currentBook?.title || currentBook?.titleKhmer}</span>
               </div> : <div className="text-center px-2 flex-1">
                 <h2 className="text-xs font-semibold uppercase tracking-wider line-clamp-1 opacity-75">
                   {currentBook?.title}
@@ -1403,7 +1403,7 @@ export default function App() {
 
               {/* Action Buttons: Edit Book & Reader Settings */}
               <div className="flex items-center space-x-1">
-                {currentView === "listen" && <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-indigo-300"><BookOpen className="mr-1 inline h-3 w-3" />Read Text</button>}
+                {currentView === "reader" && currentPage?.audioUrl && <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("listen"); }} className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-indigo-300"><Headphones className="mr-1 inline h-3 w-3" />Listen</button>}
                 <button onClick={() => window.location.reload()} aria-label="Refresh app" title="Refresh app" className="p-2 rounded-full hover:bg-black/5 active:scale-95 transition"><RotateCcw className="w-4 h-4" /></button>
                 <button
                   onClick={() => {
@@ -1467,7 +1467,10 @@ export default function App() {
             {currentView === "listen" ? <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5 sm:py-6 ${theme === "dark" ? "bg-zinc-950" : "bg-slate-50"}`}>
               <section aria-label="Audiobook player" className={`mx-auto flex min-h-full w-full max-w-3xl flex-col items-center rounded-2xl border px-5 py-6 text-center shadow-sm sm:px-8 sm:py-8 ${currentTheme.card} ${currentTheme.border}`}>
                 <img src={bookCoverImage(currentBook || {})} alt={`${currentBook?.titleKhmer || currentBook?.title} cover`} className="h-[min(34vh,300px)] max-w-[70vw] rounded-xl object-contain shadow-[0_16px_28px_rgba(15,23,42,.18)]" />
-                <span className="mt-4 rounded-full bg-indigo-50 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">● Audiobook · Page sync</span>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <span className="rounded-full bg-indigo-50 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">● Audiobook · Page sync</span>
+                  <button onClick={() => { setAudioQueueActive(false); setIsPlaying(false); setCurrentView("reader"); }} className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-indigo-300"><BookOpen className="mr-1 inline h-3 w-3" />Read Text</button>
+                </div>
                 <h1 lang={currentBook?.titleKhmer ? "km" : undefined} className="mt-2 max-w-xl text-xl font-extrabold leading-snug text-slate-900 dark:text-zinc-100 sm:text-2xl" style={currentBook?.titleKhmer ? { fontFamily: "'Kantumruy Pro', 'Battambang', sans-serif" } : undefined}>{currentBook?.titleKhmer || currentBook?.title}</h1>
                 {currentBook?.titleKhmer && <p className="mt-1 max-w-xl text-sm font-medium text-slate-500 dark:text-zinc-400">{currentBook.title}</p>}
                 {currentBook?.author && <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">{currentBook.author}</p>}
